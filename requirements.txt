@@ -1,0 +1,72 @@
+# ==============================================================================
+# FindNdap - Project Requirements & Dependency Specification
+# ==============================================================================
+# This project is a TypeScript + React 19 + Vite web application.
+# To install all dependencies automatically, navigate to this directory and run:
+#
+#     npm install
+#
+# Alternatively, you can install the exact pinned packages listed below.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. SYSTEM & RUNTIME PREREQUISITES
+# ------------------------------------------------------------------------------
+# Node.js: >= 18.0.0 (Recommended: v20.x or v22.x LTS)
+# NPM:     >= 9.0.0 (Comes bundled with Node.js)
+# OS:      Windows 10/11, macOS (Intel/Apple Silicon), or Linux (Ubuntu, Debian, Fedora, Arch)
+# Browsers: Google Chrome 90+, Mozilla Firefox 88+, Safari 14+, Microsoft Edge 90+
+
+# ------------------------------------------------------------------------------
+# 2. CORE RUNTIME DEPENDENCIES (Production)
+# ------------------------------------------------------------------------------
+react>=19.0.0
+react-dom>=19.0.0
+vite>=6.2.0
+lucide-react>=0.546.0
+motion>=12.23.0
+@tailwindcss/vite>=4.1.0
+@vitejs/plugin-react>=5.0.0
+express>=4.21.2
+dotenv>=17.2.3
+
+# ------------------------------------------------------------------------------
+# 3. DEVELOPMENT & BUILD DEPENDENCIES
+# ------------------------------------------------------------------------------
+typescript>=5.8.0
+@types/node>=22.14.0
+@types/express>=4.17.21
+tailwindcss>=4.1.0
+autoprefixer>=10.4.21
+esbuild>=0.25.0
+tsx>=4.21.0
+
+# ------------------------------------------------------------------------------
+# 4. QUICK INSTALL COMMANDS
+# ------------------------------------------------------------------------------
+# Using NPM:
+#   npm install
+#
+# Using Yarn:
+#   yarn install
+#
+# Using PNPM:
+#   pnpm install
+#
+# Using Bun:
+#   bun install
+#
+# To launch the local server:
+#   npm run dev
+#
+# Mobile App REST API endpoints will be accessible at:
+#   http://localhost:3000/api/stats
+#   http://localhost:3000/api/health
+#   http://localhost:3000/api/buildings
+#   http://localhost:3000/api/units
+#   http://localhost:3000/api/transactions
+#   http://localhost:3000/api/tickets
+#   http://localhost:3000/api/sms
+#   http://localhost:3000/api/momo/webhook   (requires X-Webhook-Secret header)
+#   http://localhost:3000/api/momo/simulate  (dev only, disabled in production)
+#
