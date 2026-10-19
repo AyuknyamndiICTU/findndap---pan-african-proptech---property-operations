@@ -40,6 +40,30 @@ body {
   overflow-x: hidden;
 }
 
+@layer base {
+  /* Form fields sit on light backgrounds everywhere. Without this they inherit the dark theme's
+     white text and look empty. Utility classes (e.g. text-white) still override it. */
+  input,
+  select,
+  textarea {
+    color: #131b2e;
+  }
+  select option {
+    color: #131b2e;
+    background-color: #ffffff;
+  }
+}
+
+/* Phones: iOS Safari zooms the whole page into any field whose text is under 16px.
+   Deliberately unlayered so it wins over the small text-xs/text-sm utilities on fields. */
+@media (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
 }
