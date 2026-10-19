@@ -115,14 +115,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300">
       {/* 1. TOP TELEMETRY / LIVE NETWORK RIBBON */}
       <div className="bg-[#001733] text-white text-[11px] font-medium border-b border-white/10 px-4 md:px-8 lg:px-12 py-1.5 flex items-center justify-between transition-all">
-        <div className="flex items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap">
+        <div className="flex items-center gap-3 min-w-0 overflow-hidden whitespace-nowrap">
           {/* Live Heartbeat Status */}
-          <div className="flex items-center gap-1.5 bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0">
-            <span className="relative flex h-2 w-2">
+          <div className="flex items-center gap-1.5 min-w-0 bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold">
+            <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span>{t('navbar.gatewayOnline')}</span>
+            <span className="truncate">{t('navbar.gatewayOnline')}</span>
           </div>
 
           {/* Regulatory & Cadastral Notice */}
@@ -144,7 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center bg-white/10 rounded-md p-0.5 border border-white/15 text-[10px] font-bold">
             <button
               onClick={() => setLang('en')}
-              className={`px-1.5 py-0.5 rounded transition-colors ${
+              className={`px-2.5 py-1 sm:px-1.5 sm:py-0.5 rounded transition-colors ${
                 lang === 'en' ? 'bg-[#ff9827] text-white' : 'text-white/70 hover:text-white'
               }`}
               title={t('navbar.langEnglishTitle')}
@@ -156,7 +156,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               onClick={() => setLang('fr')}
-              className={`px-1.5 py-0.5 rounded transition-colors ${
+              className={`px-2.5 py-1 sm:px-1.5 sm:py-0.5 rounded transition-colors ${
                 lang === 'fr' ? 'bg-[#ff9827] text-white' : 'text-white/70 hover:text-white'
               }`}
               title={t('navbar.langFrenchTitle')}
@@ -643,6 +643,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2.5 rounded-xl bg-[#eaedff] text-[#002044] hover:bg-[#dbe2ff] transition-colors"
               aria-label={t('navbar.toggleMenu')}
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>

@@ -32,27 +32,27 @@ export const TestimonialsSection: React.FC = () => {
   ];
 
   return (
-    <section className="py-20 px-4 md:px-8 lg:px-12 bg-[#faf8ff] relative">
+    <section className="py-14 sm:py-20 px-4 md:px-8 lg:px-12 bg-[#faf8ff] relative">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-14">
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-14">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#eaedff] text-[#002044] text-[11px] font-bold uppercase tracking-wider mb-3 border border-[#d5e3ff]">
             <Award className="w-3.5 h-3.5 text-[#ff9827]" />
             {t('testimonials.eyebrow')}
           </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#002044] tracking-tight mb-4">
+          <h2 className="text-[1.75rem] sm:text-4xl font-extrabold text-[#002044] tracking-tight leading-tight mb-4">
             {t('testimonials.title')}
           </h2>
-          <p className="text-[#43474f] text-base leading-relaxed">
+          <p className="text-[#43474f] text-sm sm:text-base leading-relaxed">
             {t('testimonials.intro')}
           </p>
         </div>
 
         {/* 3 Testimonials Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        <div className="-mx-4 px-4 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible mb-10 sm:mb-16">
           {testimonials.map((item, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-[#002044]/5 flex flex-col justify-between hover:shadow-md transition-shadow"
+              className="shrink-0 w-[85%] min-[480px]:w-[70%] md:w-auto snap-center bg-white rounded-3xl p-5 sm:p-7 shadow-sm border border-[#002044]/5 flex flex-col justify-between hover:shadow-md transition-shadow"
             >
               <div>
                 {/* Rating stars */}
@@ -83,7 +83,7 @@ export const TestimonialsSection: React.FC = () => {
         </div>
 
         {/* Institutional Trust & Security Pillars */}
-        <div className="rounded-2xl bg-white p-6 md:p-8 shadow-xs border border-[#002044]/5 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <div className="rounded-2xl bg-white p-5 md:p-8 shadow-xs border border-[#002044]/5 grid grid-cols-2 md:grid-cols-4 gap-5 sm:gap-6 text-center">
           <div className="flex flex-col items-center">
             <Lock className="w-6 h-6 text-[#002044] mb-2" />
             <span className="text-xs font-bold text-[#002044]">{t('testimonials.ssl')}</span>

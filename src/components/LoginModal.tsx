@@ -61,7 +61,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSigne
         aria-labelledby="login-title"
         className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-[#002044]/10 overflow-hidden"
       >
-        <div className="bg-[#002044] text-white p-5 flex items-center justify-between">
+        <div className="bg-[#002044] text-white p-4 sm:p-5 flex items-center justify-between gap-3">
           <h2 id="login-title" className="text-lg font-bold">{t('login.title')}</h2>
           <button
             onClick={onClose}
@@ -71,7 +71,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSigne
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
-        <form onSubmit={submit} className="p-6 space-y-4">
+        <form onSubmit={submit} className="p-5 sm:p-6 space-y-4">
           <p className="text-xs text-[#43474f]">
             {t('login.intro')}
           </p>
