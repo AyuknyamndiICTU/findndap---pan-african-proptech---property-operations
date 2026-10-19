@@ -13,11 +13,14 @@ export function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+// Amounts are stored in INTEGER columns; 1 billion XAF is far above any real rent or repair cost.
+export const MAX_AMOUNT_XAF = 1_000_000_000;
+
 export function isAmount(value: unknown, { allowZero }: { allowZero: boolean }): boolean {
   if (typeof value !== 'number' && typeof value !== 'string') return false;
   if (typeof value === 'string' && value.trim() === '') return false;
   const n = Number(value);
-  return Number.isFinite(n) && (allowZero ? n >= 0 : n > 0);
+  return Number.isFinite(n) && n <= MAX_AMOUNT_XAF && (allowZero ? n >= 0 : n > 0);
 }
 
 export function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
