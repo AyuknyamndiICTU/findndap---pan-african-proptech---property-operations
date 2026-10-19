@@ -301,8 +301,8 @@ export function createApp(): Express {
     if (!isNonEmptyString(username) || typeof password !== 'string' || password.length === 0) {
       return fail(req, res, 400, 'Username and password are required', "Nom d'utilisateur et mot de passe requis");
     }
-    const ip = req.ip || 'unknown';
-    const wait = loginLimiter.retryAfterSeconds(ip, username);
+    const limiterKey = loginLimiter.key(req.ip || 'unknown', username);
+    const wait = await loginLimiter.retryAfterSeconds(repo, limiterKey);
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
       return fail(
@@ -313,12 +313,12 @@ export function createApp(): Express {
         `Trop de tentatives échouées. Réessayez dans ${Math.ceil(wait / 60)} minute(s).`
       );
     }
-    const session = login(repo, username.trim(), password);
+    const session = await login(repo, username.trim(), password);
     if (!session) {
-      loginLimiter.recordFailure(ip, username);
+      await loginLimiter.recordFailure(repo, limiterKey);
       return fail(req, res, 401, 'Incorrect username or password', "Nom d'utilisateur ou mot de passe incorrect");
     }
-    loginLimiter.reset(ip, username);
+    await loginLimiter.reset(repo, limiterKey);
     const kyc = session.user.role === 'agent' ? await repo.getKyc(session.user.id) : undefined;
     res.json({
       success: true,
@@ -328,7 +328,7 @@ export function createApp(): Express {
   }));
 
   app.post('/api/auth/logout', ah(async (req: Request, res: Response) => {
-    if (res.locals.token) logout(repo, res.locals.token);
+    if (res.locals.token) await logout(repo, res.locals.token);
     res.json({ success: true });
   }));
 
@@ -350,7 +350,7 @@ export function createApp(): Express {
   // 5. Buildings API: List, Detail & Register
   app.get('/api/buildings', ah(async (req: Request, res: Response) => {
     const units = await repo.listUnits();
-    const buildings = await repo.listBuildings().map((b) => withLiveTotals(b, units));
+    const buildings = (await repo.listBuildings()).map((b) => withLiveTotals(b, units));
     res.json({ success: true, count: buildings.length, buildings });
   }));
 
@@ -471,10 +471,10 @@ export function createApp(): Express {
       occupancyRate: 0
     };
 
-    repo.transaction(() => {
-      await repo.insertBuilding(createdBuilding, user.id);
+    await repo.transaction(async (tx) => {
+      await tx.insertBuilding(createdBuilding, user.id);
       for (const u of newUnits || []) {
-        await repo.insertUnit({
+        await tx.insertUnit({
           id: newId('u'),
           buildingId: createdBuilding.id,
           unitNumber: u.unitNumber.trim(),
@@ -616,7 +616,7 @@ export function createApp(): Express {
       );
     }
 
-    const matchingUnit = findUnitForPayment({ unitId, buildingName, unitNumber, tenantName });
+    const matchingUnit = await findUnitForPayment({ unitId, buildingName, unitNumber, tenantName });
     if (isNonEmptyString(unitId) && !matchingUnit) {
       return fail(req, res, 404, 'Unit not found', 'Logement introuvable');
     }
@@ -637,7 +637,7 @@ export function createApp(): Express {
       unitId: matchingUnit?.id,
       tenantName: resolvedTenant,
       buildingName:
-        (matchingUnit && await repo.getBuilding(matchingUnit.buildingId)?.name) ||
+        (matchingUnit && (await repo.getBuilding(matchingUnit.buildingId))?.name) ||
         (isNonEmptyString(buildingName) ? buildingName.trim() : '—'),
       unitNumber: matchingUnit?.unitNumber || (isNonEmptyString(unitNumber) ? unitNumber.trim() : '—'),
       amountXAF: Math.round(Number(amountXAF)),
@@ -647,9 +647,9 @@ export function createApp(): Express {
       txRef: isNonEmptyString(txRef) ? txRef.trim() : gatewayRef(paymentMethod)
     };
 
-    repo.transaction(() => {
-      await repo.insertTransaction(newRecord);
-      if (newRecord.status === 'Completed') reconcilePayment(matchingUnit, newRecord.amountXAF);
+    await repo.transaction(async (tx) => {
+      await tx.insertTransaction(newRecord);
+      if (newRecord.status === 'Completed') await reconcilePayment(tx, matchingUnit, newRecord.amountXAF);
     });
 
     const fmt = newRecord.amountXAF.toLocaleString(langOf(req) === 'fr' ? 'fr-FR' : 'en-US');
@@ -720,7 +720,7 @@ export function createApp(): Express {
     if (isNonEmptyString(unitId) && !unit) {
       return fail(req, res, 404, 'Unit not found', 'Logement introuvable');
     }
-    const resolvedBuilding = (unit && await repo.getBuilding(unit.buildingId)?.name) || (isNonEmptyString(buildingName) ? buildingName.trim() : '');
+    const resolvedBuilding = (unit && (await repo.getBuilding(unit.buildingId))?.name) || (isNonEmptyString(buildingName) ? buildingName.trim() : '');
     const resolvedUnit = unit?.unitNumber || (isNonEmptyString(unitNumber) ? unitNumber.trim() : '');
     if (!resolvedBuilding || !resolvedUnit) {
       return fail(
@@ -871,11 +871,7 @@ export function createApp(): Express {
       );
     }
 
-    let documentFields: Pick<KycRecord, 'documentName' | 'documentPath' | 'documentMime'> = {
-      documentName: existing?.documentName,
-      documentPath: existing?.documentPath,
-      documentMime: existing?.documentMime
-    };
+    let newDocument: KycDocument | undefined;
     if (document !== undefined && document !== null) {
       const type = DOCUMENT_TYPES[document?.mimeType];
       if (!type || !isNonEmptyString(document?.name) || typeof document?.dataBase64 !== 'string') {
@@ -883,7 +879,7 @@ export function createApp(): Express {
       }
       const bytes = Buffer.from(document.dataBase64, 'base64');
       if (bytes.length === 0 || bytes.length > MAX_DOCUMENT_BYTES) {
-        return fail(req, res, 400, 'The ID document must be between 1 byte and 5 MB', "La pièce d'identité doit faire au maximum 5 Mo");
+        return fail(req, res, 400, 'The ID document must be at most 3 MB', "La pièce d'identité doit faire au maximum 3 Mo");
       }
       if (!type.magic.every((b, i) => bytes[i] === b)) {
         return fail(
@@ -894,16 +890,13 @@ export function createApp(): Express {
           'Le contenu du fichier ne correspond pas à son type (PDF, JPG ou PNG attendu)'
         );
       }
-      const fileName = `${user.id}-${randomBytes(8).toString('hex')}.${type.ext}`;
-      fs.writeFileSync(path.join(UPLOADS_DIR, fileName), bytes);
-      if (existing?.documentPath) fs.rmSync(path.join(UPLOADS_DIR, existing.documentPath), { force: true });
-      documentFields = {
-        documentName: path.basename(document.name).slice(0, 120),
-        documentPath: fileName,
-        documentMime: document.mimeType
+      newDocument = {
+        name: path.basename(String(document.name).replace(/\\/g, '/')).slice(0, 120),
+        mime: document.mimeType,
+        data: bytes
       };
     }
-    if (!documentFields.documentPath) {
+    if (!newDocument && !existing?.hasDocument) {
       return fail(
         req,
         res,
@@ -920,7 +913,6 @@ export function createApp(): Express {
       licenseId: licenseId.trim(),
       city: city.trim(),
       momoNumber: formatCameroonMobile(momoNumber),
-      ...documentFields,
       isCertified: false,
       status: 'in-review',
       submittedAt: nowIso(),
@@ -928,7 +920,7 @@ export function createApp(): Express {
       reviewNote: undefined,
       badgeId: undefined
     };
-    await repo.saveKyc(record);
+    await repo.saveKyc(record, newDocument);
 
     res.json({
       success: true,
@@ -937,29 +929,26 @@ export function createApp(): Express {
         'Application submitted. An administrator will review your documents.',
         'Demande envoyée. Un administrateur va examiner vos documents.'
       ),
-      agentKYC: publicKyc(await repo.getKyc(user.id)!)
+      agentKYC: publicKyc((await repo.getKyc(user.id))!)
     });
   }));
 
   app.get('/api/admin/agents', requireRole('admin'), ah(async (req: Request, res: Response) => {
-    const agents = await repo.listKyc().map(publicKyc);
+    const agents = (await repo.listKyc()).map(publicKyc);
     res.json({ success: true, count: agents.length, agents });
   }));
 
   app.get('/api/admin/agents/:userId/document', requireRole('admin'), ah(async (req: Request, res: Response) => {
-    const kyc = await repo.getKyc(req.params.userId);
-    if (!kyc?.documentPath || !kyc.documentMime) {
+    const doc = await repo.getKycDocument(req.params.userId);
+    if (!doc || !DOCUMENT_TYPES[doc.mime]) {
       return fail(req, res, 404, 'No document on file', 'Aucun document enregistré');
     }
-    const file = path.join(UPLOADS_DIR, path.basename(kyc.documentPath));
-    if (!fs.existsSync(file)) {
-      return fail(req, res, 404, 'No document on file', 'Aucun document enregistré');
-    }
-    const safeName = (kyc.documentName || 'document').replace(/[^A-Za-z0-9._-]/g, '_');
-    res.setHeader('Content-Type', kyc.documentMime);
+    const safeName = doc.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    res.setHeader('Content-Type', doc.mime);
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    fs.createReadStream(file).pipe(res);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(doc.data);
   }));
 
   app.post('/api/admin/agents/:userId/review', requireRole('admin'), ah(async (req: Request, res: Response) => {
@@ -1006,11 +995,11 @@ export function createApp(): Express {
   }));
 
   // 11. MTN MoMo & Orange Money Payment Callbacks
-  function processMoMoPayment(req: Request, body: any) {
+  async function processMoMoPayment(req: Request, body: any) {
     const { amount, unitReference, transactionRef } = body;
     const amountNum = Math.round(Number(amount));
     const method: FinancialRecord['method'] = isOneOf(body.method, PAYMENT_METHODS) ? body.method : 'MTN MoMo';
-    const match = findUnitForPayment({
+    const match = await findUnitForPayment({
       unitId: body.unitId,
       buildingName: body.buildingName,
       unitNumber: unitReference,
@@ -1022,7 +1011,7 @@ export function createApp(): Express {
       unitId: match?.id,
       tenantName: (isNonEmptyString(body.tenantName) && body.tenantName.trim()) || match?.tenantName || 'Unknown payer',
       buildingName:
-        (match && await repo.getBuilding(match.buildingId)?.name) || (isNonEmptyString(body.buildingName) ? body.buildingName.trim() : '—'),
+        (match && (await repo.getBuilding(match.buildingId))?.name) || (isNonEmptyString(body.buildingName) ? body.buildingName.trim() : '—'),
       unitNumber: match?.unitNumber || (isNonEmptyString(unitReference) ? unitReference.trim() : '—'),
       amountXAF: amountNum,
       method,
@@ -1031,9 +1020,9 @@ export function createApp(): Express {
       txRef: isNonEmptyString(transactionRef) ? transactionRef.trim() : gatewayRef(method)
     };
 
-    repo.transaction(() => {
-      await repo.insertTransaction(newTx);
-      reconcilePayment(match, amountNum);
+    await repo.transaction(async (tx) => {
+      await tx.insertTransaction(newTx);
+      await reconcilePayment(tx, match, amountNum);
     });
 
     return {
@@ -1065,7 +1054,7 @@ export function createApp(): Express {
       return fail(req, res, 401, 'Invalid or missing webhook secret', 'Secret du webhook invalide ou manquant');
     }
     if (momoAmountError(req, res)) return;
-    res.status(200).json(processMoMoPayment(req, req.body));
+    res.status(200).json(await processMoMoPayment(req, req.body));
   }));
 
   // In-browser Developer Sandbox simulator: admin only, disabled in production.
@@ -1074,34 +1063,30 @@ export function createApp(): Express {
       return fail(req, res, 404, 'Not found', 'Introuvable');
     }
     next();
-  }, requireRole('admin'), (req: Request, res: Response) => {
+  }, requireRole('admin'), ah(async (req: Request, res: Response) => {
     if (momoAmountError(req, res)) return;
-    res.status(200).json(processMoMoPayment(req, req.body));
-  });
+    res.status(200).json(await processMoMoPayment(req, req.body));
+  }));
 
   // Unknown API routes return JSON instead of falling through to the SPA.
   app.use('/api', (req: Request, res: Response) => fail(req, res, 404, 'Not found', 'Introuvable'));
 
-  // ============================================================================
-  // FRONTEND CLIENT INTEGRATION (Vite Middleware in Dev / Static in Prod)
-  // ============================================================================
-  if (!IS_PRODUCTION) {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`FindNdap Core Full-Stack Server running at http://0.0.0.0:${PORT}`);
+  // Errors from any /api handler end up here as JSON. A duplicate key (two requests racing to
+  // register the same Titre Foncier or unit number) is reported as a conflict, not a crash.
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) return next(err);
+    if (err?.type === 'entity.too.large') {
+      return fail(req, res, 413, 'The request is too large (maximum 4.5 MB)', 'La requête est trop volumineuse (4,5 Mo maximum)');
+    }
+    if (err?.type === 'entity.parse.failed') {
+      return fail(req, res, 400, 'The request body is not valid JSON', "Le corps de la requête n'est pas un JSON valide");
+    }
+    if (err?.code === '23505') {
+      return fail(req, res, 409, 'This record already exists', 'Cet enregistrement existe déjà');
+    }
+    console.error('[api] Unhandled error:', err);
+    return fail(req, res, 500, 'Something went wrong on the server. Please try again.', 'Une erreur est survenue sur le serveur. Veuillez réessayer.');
   });
-}
 
-startServer();
+  return app;
+}

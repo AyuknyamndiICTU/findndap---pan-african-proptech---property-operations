@@ -28,7 +28,8 @@ The platform bridges real-time Mobile Money rent settlements (MTN MoMo & Orange 
 4. **Accounts, Persistence & Languages**
    - **Role-based logins**: A landlord/administrator account and agent accounts, configured in `.env`. Reading is public; every change requires signing in.
    - **Real certification review**: Agents upload an ID document and apply; an administrator reviews the document and approves or rejects the application.
-   - **SQLite database**: All data survives restarts (`data/findndap.db`), seeded with demo data on first start.
+   - **Neon Postgres database**: All data, including agent ID documents, is stored in Postgres (Neon), created and filled with demo data on first start.
+   - **Ready for Vercel**: The frontend is served from Vercel's CDN and the API runs as a single Vercel Function (see [Deploying to Vercel + Neon](#-deploying-to-vercel--neon)).
    - **PDF receipts**: Downloadable rent receipts for completed payments, in English or French.
    - **English / French interface**: The EN/FR switch translates the whole interface, and server messages follow the chosen language.
 
@@ -39,7 +40,8 @@ The platform bridges real-time Mobile Money rent settlements (MTN MoMo & Orange 
 - **Framework**: [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
 - **Bundler & Dev Server**: [Vite 6](https://vite.dev/)
 - **API Server**: [Express 4](https://expressjs.com/)
-- **Database**: SQLite via [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
+- **Database**: [Neon](https://neon.com/) serverless Postgres via [node-postgres (`pg`)](https://node-postgres.com/)
+- **Hosting**: [Vercel](https://vercel.com/) (static frontend + one Node.js function for the API)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Animations**: [Motion](https://motion.dev/)
@@ -51,14 +53,15 @@ The platform bridges real-time Mobile Money rent settlements (MTN MoMo & Orange 
 
 Before running the project locally, ensure your computer has:
 
-- **Node.js**: Version **22** or newer (required by the SQLite driver, `better-sqlite3`)
+- **Node.js**: Version **22** or newer
   - Download from [nodejs.org](https://nodejs.org/)
   - Verify installation in your terminal:
     ```bash
     node -v
     npm -v
     ```
-- **Package Manager**: `npm` (comes bundled with Node.js). `yarn` and `pnpm` also work; Bun is not supported because `better-sqlite3` is a native Node.js module.
+- **Package Manager**: `npm` (comes bundled with Node.js)
+- **A Neon account** (free tier is enough): [neon.com](https://neon.com/). The app needs a Postgres database even for local development.
 
 ---
 
@@ -132,7 +135,17 @@ npm run setup
 
 This copies `.env.example` to `.env`, generates a random administrator password and webhook secret, and prints the admin password **once**, so store it. It never overwrites an existing `.env` (use `npm run setup -- --force` to regenerate).
 
-Then open `.env` and add agent accounts if you need them:
+Then open `.env` and paste a Neon connection string into `DATABASE_URL`. Use a **separate Neon branch for development** so local testing never touches production data:
+
+1. In the [Neon console](https://console.neon.tech/), open your project → **Branches** → **Create branch**, name it `dev`.
+2. Select the `dev` branch → **Connect** → keep **Connection pooling** on → copy the connection string (its host contains `-pooler`).
+3. Paste it into `.env`:
+
+   ```dotenv
+   DATABASE_URL="postgresql://user:password@ep-xxxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require"
+   ```
+
+Then add agent accounts if you need them:
 
 ```dotenv
 AGENT_ACCOUNTS="beatrice:a-strong-password,etienne:another-password"
@@ -150,14 +163,14 @@ Run the development command:
 npm run dev
 ```
 
-This starts the Express API and Vite's frontend dev server together on port **3000** (set `PORT` in `.env` to change it). On first start it creates the SQLite database in `data/` and fills it with demo buildings, units, payments and work-orders.
+This starts the Express API and Vite's frontend dev server together on port **3000** (set `PORT` in `.env` to change it). On first start it creates the tables in your Neon database and fills them with demo buildings, units, payments and work-orders (set `SEED_DEMO_DATA=false` beforehand to start empty).
 
 You will see terminal output:
 ```text
 FindNdap Core Full-Stack Server running at http://0.0.0.0:3000
 ```
 
-If an account in `.env` is invalid (for example a password shorter than 8 characters), a warning starting with `[auth]` is printed and that account is skipped.
+If an account in `.env` is invalid (for example a password shorter than 8 characters), a warning starting with `[auth]` is printed and that account is skipped. If `DATABASE_URL` is missing or wrong, the server stops with "Could not start the server" and the reason.
 
 ---
 
@@ -186,7 +199,7 @@ npm run build
 npm start
 ```
 
-The production server runs from the project folder, serves the built files from `dist/`, and reads the same `.env` and `data/` folder. Set `VITE_APK_URL` **before** `npm run build` if you want the APK buttons enabled (it is baked into the client bundle). In production the in-browser payment simulator (`/api/momo/simulate`) is disabled.
+The production server runs from the project folder, serves the built files from `dist/`, and reads the same `.env`. To host on Vercel instead, see [Deploying to Vercel + Neon](#-deploying-to-vercel--neon). Set `VITE_APK_URL` **before** `npm run build` if you want the APK buttons enabled (it is baked into the client bundle). In production the in-browser payment simulator (`/api/momo/simulate`) is disabled.
 
 ---
 
@@ -196,7 +209,7 @@ The production server runs from the project folder, serves the built files from 
 | :--- | :--- | :--- |
 | **First-time Setup** | `npm run setup` | Creates `.env` from `.env.example` with a generated admin password and webhook secret |
 | **Full-Stack Dev Server** | `npm run dev` | Starts the Express API and the Vite hot-reload frontend on port 3000 |
-| **Production Build** | `npm run build` | Builds the frontend into `dist/` and bundles `server.ts` into `dist/server.cjs` (production mode) |
+| **Production Build** | `npm run build` | Builds the frontend into `dist/` and bundles `server.ts` into `dist/server.cjs`. On Vercel (or with `npm run build -- --vercel`) it also writes `.vercel/output` |
 | **Start Production** | `npm start` | Runs the built production server (`node dist/server.cjs`) |
 | **Type Check / Lint** | `npm run lint` | Runs the TypeScript compiler (`tsc --noEmit`) |
 | **Clean Artifacts** | `npm run clean` | Removes the `dist/` folder |
@@ -211,22 +224,24 @@ All scripts call Node directly (no shell commands or `node_modules/.bin` shims),
 findndap/
 ├── index.html                 # Main HTML entry point with meta tags & typography
 ├── package.json               # Project manifest, scripts & dependencies
-├── server.ts                  # Express server: REST API routes, auth & roles, Vite middleware / static files
+├── server.ts                  # Local entry point: API + Vite dev server (npm run dev) or dist/ (npm start)
+├── vercel.json                # Vercel project settings (build command; output comes from scripts/build.mjs)
 ├── server/
-│   ├── db.ts                  # SQLite schema, first-run seeding and data access (better-sqlite3)
+│   ├── app.ts                 # Express app: every REST API route, auth & roles, start-up (schema, seed, accounts)
+│   ├── vercel.ts              # Vercel Function entry point (wraps the Express app)
+│   ├── db.ts                  # Postgres (Neon) schema, first-run seeding and data access (pg)
 │   ├── auth.ts                # Password hashing, .env account sync, sessions, role checks, login rate limit
 │   ├── validation.ts          # Input validators, allowed values, collision-safe ids
 │   ├── pdf.ts                 # Dependency-free PDF receipt generator (EN/FR)
 │   └── http.ts                # English/French error and message helpers (Accept-Language)
 ├── scripts/
 │   ├── setup-env.mjs          # `npm run setup`: creates .env with generated secrets
-│   ├── build.mjs              # `npm run build`: Vite client build + esbuild server bundle
+│   ├── build.mjs              # `npm run build`: Vite build, server bundle, and on Vercel the .vercel/output folder
 │   └── clean.mjs              # `npm run clean`
-├── data/                      # Created at runtime: findndap.db + uploads/ (git-ignored, back it up)
 ├── requirements.txt           # Dependency requirements & endpoint reference list
 ├── tsconfig.json              # TypeScript compilation rules
 ├── vite.config.ts             # Vite configuration with Tailwind CSS plugin
-├── .env.example               # Configuration template (accounts, secrets, data folder, APK link)
+├── .env.example               # Configuration template (database URL, accounts, secrets, APK link)
 ├── public/                    # Static public assets
 └── src/
     ├── main.tsx               # React application entry point (wrapped in the language provider)
@@ -267,31 +282,29 @@ findndap/
 ## ⚡ Troubleshooting & FAQ
 
 ### 1. Port 3000 is already in use
-If another application is using port 3000, set a different port in `.env` (for example `PORT=3001`) and restart `npm run dev`.
+If another application is using port 3000, set a different port in `.env` (for example `PORT=3005`) and restart `npm run dev`.
 
-### 2. "Sign in" fails or there is no admin account
-- Check `ADMIN_PASSWORD` in `.env` is set and at least 8 characters, then restart the server. Look for `[auth]` warnings in the terminal.
-- After 5 failed attempts for the same username, sign-in is blocked for 15 minutes.
+### 2. "Could not start the server: DATABASE_URL is not set" (or a connection error)
+- Paste your Neon connection string into `DATABASE_URL` in `.env` (see Step 5). It must start with `postgresql://` and end with `?sslmode=require`.
+- If Neon says the password is wrong, reset it in the Neon console (**Roles**) and copy a fresh connection string.
+- On Vercel, check **Project Settings → Environment Variables** contains `DATABASE_URL` for the right environment, then redeploy.
 
-### 3. `npm install` fails while building `better-sqlite3`
-`better-sqlite3` downloads a prebuilt binary for your Node.js version. If none exists (very new or very old Node.js), npm compiles it and needs build tools (Python and a C++ compiler; on Windows, "Desktop development with C++" from the Visual Studio Build Tools). Using the current Node.js LTS (22 or newer) avoids this.
+### 3. "Sign in" fails or there is no admin account
+- Check `ADMIN_PASSWORD` is set and at least 8 characters (in `.env` locally, in the Vercel project settings online), then restart or redeploy. Look for `[auth]` warnings in the terminal or in Vercel's function logs.
+- After 5 failed attempts for the same username from the same IP, sign-in is blocked for 15 minutes.
 
 ### 4. Resetting the demo data
-Stop the server and delete the `data/` folder (or just `data/findndap.db`). It is recreated and re-seeded on the next start. This also deletes uploaded agent documents and all certification decisions.
+Delete and recreate the database (Neon console → your branch → **Databases**), or simply create a new Neon branch and point `DATABASE_URL` at it. Tables and demo data are recreated on the next start. This also deletes uploaded agent documents and all certification decisions.
 
-### 2. PowerShell script execution error on Windows
-If you see an error like `File ... cannot be loaded because running scripts is disabled on this system`:
-Run PowerShell as Administrator and execute:
+### 5. PowerShell script execution error on Windows
+If you see an error like `File ... cannot be loaded because running scripts is disabled on this system`, run:
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 Then rerun `npm install` and `npm run dev`.
 
-### 3. Node version mismatch
-Ensure you are running **Node.js v18 or higher**. Check with `node -v`. If you have an older version, update it from [nodejs.org](https://nodejs.org/) or switch using `nvm`:
-```bash
-nvm use 20
-```
+### 6. Node version mismatch
+Run **Node.js 22 or newer**. Check with `node -v` and update from [nodejs.org](https://nodejs.org/) if needed.
 
 ---
 

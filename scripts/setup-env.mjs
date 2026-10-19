@@ -24,4 +24,4 @@ const adminUser = /^ADMIN_USERNAME="?([^"\r\n]*)"?/m.exec(env)?.[1] || 'admin';
 console.log('Created .env with new secrets.');
 console.log(`  Admin username: ${adminUser}`);
 console.log(`  Admin password: ${adminPassword}   (shown once - store it somewhere safe)`);
-console.log('Add agent accounts to AGENT_ACCOUNTS in .env, then run "npm run dev".');
+console.log('Next: paste your Neon connection string into DATABASE_URL, add agents to AGENT_ACCOUNTS, then run "npm run dev".');

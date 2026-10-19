@@ -36,7 +36,8 @@ interface AgentCertificationSectionProps {
   onOpenApprovals: () => void;
 }
 
-const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+// Must match the server limit (Vercel caps request bodies at 4.5 MB; 3 MB is ~4 MB once base64-encoded).
+const MAX_DOCUMENT_BYTES = 3 * 1024 * 1024;
 const DOCUMENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 const CITY_OPTIONS = [
   'Douala (Littoral, Cameroon)',
