@@ -90,7 +90,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     <section
       ref={sectionRef}
       onMouseMove={handleSectionMouseMove}
-      className={`relative overflow-hidden pt-10 pb-24 px-4 md:px-8 lg:px-12 transition-colors duration-700 ${
+      className={`relative overflow-hidden pt-6 sm:pt-10 pb-16 sm:pb-24 px-4 md:px-8 lg:px-12 transition-colors duration-700 ${
         isDark ? 'bg-[#050b14] text-white' : 'bg-[#faf8ff] text-[#131b2e]'
       }`}
     >
@@ -126,12 +126,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       />
 
       <div className="max-w-7xl mx-auto relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 lg:gap-14 items-center">
           {/* Left Column: Headline, Copy, Interactive Telemetry & Actions */}
           <div className="lg:col-span-7 flex flex-col items-start">
             {/* Cadastral Trust Network Badge with Futuristic Beacon */}
             <div
-              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full backdrop-blur-md mb-6 shadow-xs border transition-transform hover:scale-105 duration-300 ${
+              className={`inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full backdrop-blur-md mb-5 sm:mb-6 shadow-xs border transition-transform hover:scale-105 duration-300 ${
                 isDark
                   ? 'bg-white/10 text-white border-white/20'
                   : 'bg-white/90 text-[#002044] border-[#d5e3ff]'
@@ -141,7 +141,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff9827] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ff9827]" />
               </span>
-              <span className="text-[11px] font-bold uppercase tracking-wider">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
                 {t('hero.badge')}
               </span>
               <ShieldCheck className="w-3.5 h-3.5 text-[#ff9827]" />
@@ -149,7 +149,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             {/* Main Hero Title */}
             <h1
-              className={`text-4xl sm:text-5xl lg:text-[54px] font-extrabold tracking-tight leading-[1.12] mb-5 ${
+              className={`text-[2rem] leading-[1.1] sm:text-5xl sm:leading-[1.12] lg:text-[54px] font-extrabold tracking-tight mb-4 sm:mb-5 ${
                 isDark ? 'text-white' : 'text-[#002044]'
               }`}
             >
@@ -168,7 +168,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             {/* Hero Subtitle */}
             <p
-              className={`text-lg max-w-2xl mb-8 leading-relaxed ${
+              className={`text-base sm:text-lg max-w-2xl mb-6 sm:mb-8 leading-relaxed ${
                 isDark ? 'text-gray-300' : 'text-[#43474f]'
               }`}
             >
@@ -176,7 +176,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </p>
 
             {/* Dual CTAs with 3D Hover Depth */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto mb-8">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto mb-6 sm:mb-8">
               <button
                 onClick={onRegisterAgentClick}
                 className="group relative overflow-hidden flex flex-col px-6 py-3.5 bg-gradient-to-r from-[#ff9827] to-[#e68316] hover:from-[#e68316] hover:to-[#8e4f00] text-white rounded-2xl shadow-lg transition-all duration-300 hover:scale-[1.03] hover:shadow-orange-500/25 text-left border border-white/20"
@@ -254,7 +254,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   type="button"
                   aria-pressed={activeTab === 'console'}
                   onClick={() => handleTabToggle('console')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                     activeTab === 'console'
                       ? 'bg-[#002044] text-white shadow-xs'
                       : isDark
@@ -269,7 +269,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   type="button"
                   aria-pressed={activeTab === 'radar'}
                   onClick={() => handleTabToggle('radar')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                     activeTab === 'radar'
                       ? 'bg-[#002044] text-white shadow-xs'
                       : isDark
@@ -367,7 +367,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   glareOpacity={0.28}
                   borderLaser={true}
                   hudCorners={true}
-                  className="group cursor-pointer rounded-3xl bg-white p-6 shadow-2xl border border-[#002044]/10 transition-all hover:shadow-[0_25px_60px_rgba(0,32,68,0.25)]"
+                  className="group cursor-pointer rounded-3xl bg-white p-4 sm:p-6 shadow-2xl border border-[#002044]/10 transition-all hover:shadow-[0_25px_60px_rgba(0,32,68,0.25)]"
                 >
                   {/* Click prompt overlay with neon accent */}
                   <div className="absolute top-3 right-4 z-30 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center gap-1.5 bg-[#002044] text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg border border-[#ff9827]/50">
@@ -386,35 +386,35 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   </div>
 
                   {/* App Header simulation */}
-                  <div className="flex items-center justify-between pb-3.5 mb-4 bg-gradient-to-r from-[#f2f3ff] to-[#eaedff] p-3.5 rounded-2xl border border-[#eaedff]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#002044] flex items-center justify-center p-1.5 shadow-md group-hover:scale-105 transition-transform">
+                  <div className="flex items-center justify-between gap-2 pb-3.5 mb-3 sm:mb-4 bg-gradient-to-r from-[#f2f3ff] to-[#eaedff] p-3 sm:p-3.5 rounded-2xl border border-[#eaedff]">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 shrink-0 rounded-xl bg-[#002044] flex items-center justify-center p-1.5 shadow-md group-hover:scale-105 transition-transform">
                         <BrandLogo size="sm" showText={false} />
                       </div>
                       <div>
-                        <div className="text-base font-bold text-[#002044] leading-tight">{t('hero.appName')}</div>
-                        <div className="text-[11px] font-bold text-[#ff9827] flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        <div className="text-base font-bold text-[#002044] leading-tight truncate">{t('hero.appName')}</div>
+                        <div className="text-[11px] font-bold text-[#ff9827] flex items-center gap-1.5 truncate">
+                          <span className="w-2 h-2 shrink-0 rounded-full bg-emerald-500 animate-ping" />
                           {t('hero.liveCenter')}
                         </div>
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-[#002044] text-white text-[10px] font-bold uppercase tracking-wider shadow-xs">
+                    <span className="hidden min-[400px]:inline-block shrink-0 px-2.5 py-1 rounded-full bg-[#002044] text-white text-[10px] font-bold uppercase tracking-wider shadow-xs">
                       {t('hero.hq')}
                     </span>
                   </div>
 
                   {/* Live Stats Bento Grid inside Mockup */}
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="p-3.5 rounded-2xl bg-[#f2f3ff] border border-[#eaedff] flex flex-col justify-between group-hover:border-[#ff9827]/30 transition-colors">
-                      <div className="flex items-center justify-between text-[#43474f]">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+                    <div className="min-w-0 p-3 sm:p-3.5 rounded-2xl bg-[#f2f3ff] border border-[#eaedff] flex flex-col justify-between group-hover:border-[#ff9827]/30 transition-colors">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[#43474f]">
                         <span className="text-xs font-semibold">{t('hero.activeBuildings')}</span>
                         <span className="text-[10px] font-bold font-mono text-[#002044] bg-white px-1.5 py-0.5 rounded shadow-2xs">
                           {t('hero.tfSynced')}
                         </span>
                       </div>
                       <div className="mt-2">
-                        <div className="text-2xl font-extrabold text-[#002044] tracking-tight">
+                        <div className="text-xl sm:text-2xl font-extrabold text-[#002044] tracking-tight break-words">
                           {stats ? t('hero.properties', { count: num(stats.totalBuildings) }) : '—'}
                         </div>
                         <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
@@ -424,15 +424,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       </div>
                     </div>
 
-                    <div className="p-3.5 rounded-2xl bg-[#f2f3ff] border border-[#eaedff] flex flex-col justify-between group-hover:border-[#ff9827]/30 transition-colors">
-                      <div className="flex items-center justify-between text-[#43474f]">
+                    <div className="min-w-0 p-3 sm:p-3.5 rounded-2xl bg-[#f2f3ff] border border-[#eaedff] flex flex-col justify-between group-hover:border-[#ff9827]/30 transition-colors">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[#43474f]">
                         <span className="text-xs font-semibold">{t('hero.occupancy')}</span>
                         <span className="text-[10px] font-bold font-mono text-[#ff9827] bg-white px-1.5 py-0.5 rounded shadow-2xs">
                           {t('hero.live')}
                         </span>
                       </div>
                       <div className="mt-2">
-                        <div className="text-2xl font-extrabold text-[#ff9827] tracking-tight">
+                        <div className="text-xl sm:text-2xl font-extrabold text-[#ff9827] tracking-tight">
                           {stats ? t('hero.percent', { value: num(stats.occupancyRate) }) : '—'}
                         </div>
                         <span className="text-[11px] font-bold text-[#002044]">
@@ -443,18 +443,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   </div>
 
                   {/* Rent Flow / Automated Ledger Box */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[#002044] to-[#0f3563] text-white mb-4 relative overflow-hidden shadow-inner border border-white/10">
-                    <div className="flex justify-between items-start mb-2">
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#002044] to-[#0f3563] text-white mb-3 sm:mb-4 relative overflow-hidden shadow-inner border border-white/10">
+                    <div className="flex justify-between items-start gap-2 mb-2">
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[#d5e3ff] flex items-center gap-1.5">
                           <Activity className="w-3.5 h-3.5 text-[#ff9827] animate-pulse" />
                           {t('hero.ledgerTitle')}
                         </span>
-                        <div className="text-xl font-extrabold mt-0.5 font-mono">
+                        <div className="text-lg sm:text-xl font-extrabold mt-0.5 font-mono">
                           {stats ? formatXaf(stats.collectedRevenueXAF, locale) : '— XAF'}
                         </div>
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-md bg-[#ff9827] text-white text-[10px] font-bold font-mono shadow-xs">
+                      <span className="hidden min-[400px]:inline-block shrink-0 px-2.5 py-0.5 rounded-md bg-[#ff9827] text-white text-[10px] font-bold font-mono shadow-xs">
                         {t('hero.instantPayout')}
                       </span>
                     </div>
@@ -478,9 +478,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   </div>
 
                   {/* Fast Maintenance Resolution Metric */}
-                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#eaedff] border border-[#d5e3ff]/60">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#002044] shadow-xs">
+                  <div className="flex items-center justify-between gap-2 p-3 sm:p-3.5 rounded-2xl bg-[#eaedff] border border-[#d5e3ff]/60">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 shrink-0 rounded-full bg-white flex items-center justify-center text-[#002044] shadow-xs">
                         <Wrench className="w-4 h-4 text-[#ff9827]" />
                       </div>
                       <div>
@@ -490,8 +490,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-base font-bold text-[#002044] font-mono">
+                    <div className="text-right shrink-0">
+                      <div className="text-sm sm:text-base font-bold text-[#002044] font-mono whitespace-nowrap">
                         {stats ? t('hero.fixed', { count: num(stats.resolvedTicketsCount) }) : '—'}
                       </div>
                       <span className="text-[10px] font-bold text-emerald-700 uppercase font-mono">

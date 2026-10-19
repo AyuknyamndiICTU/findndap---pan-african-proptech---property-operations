@@ -244,31 +244,73 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
     return `${u.unitNumber}${b ? ` – ${b}` : ''}${u.tenantName ? ` (${u.tenantName})` : ''}`;
   };
 
+  const methodBadge = (tx: FinancialRecord) => (
+    <span
+      className={`px-2 py-0.5 rounded text-[11px] font-bold whitespace-nowrap ${
+        tx.method === 'MTN MoMo'
+          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+          : 'bg-orange-100 text-orange-900 border border-orange-300'
+      }`}
+    >
+      {tx.method}
+    </span>
+  );
+
+  const statusBadge = (tx: FinancialRecord) => (
+    <span
+      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
+        tx.status === 'Completed'
+          ? 'bg-emerald-100 text-emerald-800'
+          : tx.status === 'Escrow_Locked'
+          ? 'bg-blue-100 text-blue-800'
+          : 'bg-rose-100 text-rose-800'
+      }`}
+    >
+      {label('enums.txStatus', tx.status)}
+    </span>
+  );
+
+  const receiptAction = (tx: FinancialRecord) =>
+    tx.status === 'Completed' ? (
+      <button
+        onClick={() => handleDownloadReceipt(tx.id)}
+        aria-label={t('console.downloadReceipt', { ref: tx.txRef })}
+        className="text-[#0f3563] hover:underline font-semibold flex items-center gap-1 py-1"
+      >
+        <FileText className="w-3.5 h-3.5 text-[#ff9827]" aria-hidden="true" />
+        <span>{t('console.pdf')}</span>
+      </button>
+    ) : (
+      <span className="text-[11px] text-[#747780]" title={t('console.receiptPending')}>
+        —
+      </span>
+    );
+
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-xs flex items-stretch sm:items-center justify-center p-0 sm:p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="landlord-console-title"
-        className="relative w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-[#002044]/10 overflow-hidden my-4 flex flex-col max-h-[92vh]"
+        className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-3xl shadow-2xl sm:border border-[#002044]/10 overflow-hidden sm:my-4 flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]"
       >
         {/* Header Bar */}
-        <div className="bg-[#002044] text-white p-5 px-6 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#ff9827] text-white flex items-center justify-center shadow-sm">
+        <div className="bg-[#002044] text-white py-3 px-4 sm:p-5 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-5 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="hidden sm:flex w-10 h-10 shrink-0 rounded-xl bg-[#ff9827] text-white items-center justify-center shadow-sm">
               <Smartphone className="w-5 h-5" aria-hidden="true" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 id="landlord-console-title" className="text-xl font-bold tracking-tight">{t('console.title')}</h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
+                <h2 id="landlord-console-title" className="text-base sm:text-xl font-bold tracking-tight truncate">{t('console.title')}</h2>
+                <span className="hidden sm:inline px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
                   {t('console.liveBadge')}
                 </span>
               </div>
-              <span className="text-xs text-[#d5e3ff]">
+              <span className="hidden sm:block text-xs text-[#d5e3ff]">
                 {t('console.subtitle')}
               </span>
             </div>
@@ -276,21 +318,21 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
           <button
             onClick={onClose}
             aria-label={t('console.closeConsole')}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+            className="w-10 h-10 sm:w-9 sm:h-9 shrink-0 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
         {!canEdit && (
-          <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div className="flex items-center gap-2 text-xs font-semibold text-amber-900">
-              <Lock className="w-4 h-4" aria-hidden="true" />
+          <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2 min-w-0 text-[11px] sm:text-xs font-semibold leading-snug text-amber-900">
+              <Lock className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>{t('console.readOnly')}</span>
             </div>
             <button
               onClick={onSignIn}
-              className="px-3 py-1.5 rounded-lg bg-[#002044] text-white text-xs font-bold hover:bg-[#0f3563]"
+              className="shrink-0 px-3 py-2 sm:py-1.5 rounded-lg bg-[#002044] text-white text-xs font-bold hover:bg-[#0f3563]"
             >
               {t('console.signIn')}
             </button>
@@ -298,10 +340,10 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
         )}
 
         {/* Tab Navigation */}
-        <div className="flex overflow-x-auto border-b border-[#eaedff] bg-[#faf8ff] px-6 text-xs font-bold text-[#43474f] shrink-0">
+        <div className="flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-[#eaedff] bg-[#faf8ff] px-1 sm:px-6 text-xs font-bold text-[#43474f] shrink-0">
           <button
             onClick={() => setCurrentTab('overview')}
-            className={`py-3.5 px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+            className={`py-3 px-3 sm:py-3.5 sm:px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               currentTab === 'overview'
                 ? 'border-[#ff9827] text-[#002044] bg-white'
                 : 'border-transparent hover:text-[#002044]'
@@ -312,7 +354,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
           </button>
           <button
             onClick={() => setCurrentTab('ledger')}
-            className={`py-3.5 px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+            className={`py-3 px-3 sm:py-3.5 sm:px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               currentTab === 'ledger'
                 ? 'border-[#ff9827] text-[#002044] bg-white'
                 : 'border-transparent hover:text-[#002044]'
@@ -323,7 +365,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
           </button>
           <button
             onClick={() => setCurrentTab('sms')}
-            className={`py-3.5 px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+            className={`py-3 px-3 sm:py-3.5 sm:px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               currentTab === 'sms'
                 ? 'border-[#ff9827] text-[#002044] bg-white'
                 : 'border-transparent hover:text-[#002044]'
@@ -334,7 +376,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
           </button>
           <button
             onClick={() => setCurrentTab('maintenance')}
-            className={`py-3.5 px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+            className={`py-3 px-3 sm:py-3.5 sm:px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               currentTab === 'maintenance'
                 ? 'border-[#ff9827] text-[#002044] bg-white'
                 : 'border-transparent hover:text-[#002044]'
@@ -345,7 +387,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
           </button>
           <button
             onClick={() => setCurrentTab('units')}
-            className={`py-3.5 px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+            className={`py-3 px-3 sm:py-3.5 sm:px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               currentTab === 'units'
                 ? 'border-[#ff9827] text-[#002044] bg-white'
                 : 'border-transparent hover:text-[#002044]'
@@ -357,7 +399,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
           {canEdit && (
             <button
               onClick={() => setCurrentTab('agents')}
-              className={`py-3.5 px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+              className={`py-3 px-3 sm:py-3.5 sm:px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
                 currentTab === 'agents'
                   ? 'border-[#ff9827] text-[#002044] bg-white'
                   : 'border-transparent hover:text-[#002044]'
@@ -370,15 +412,15 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+        <div className="p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto flex-1 space-y-5 sm:space-y-6">
           {/* TAB: OVERVIEW */}
           {currentTab === 'overview' && (
             <div className="space-y-6">
               {/* Top Stats Strip */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="col-span-2 sm:col-span-1 p-3.5 sm:p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
                   <span className="text-xs text-[#747780] font-semibold block">{t('console.rentRoll')}</span>
-                  <div className="text-2xl font-extrabold text-[#002044] mt-1">
+                  <div className="text-xl sm:text-2xl font-extrabold text-[#002044] mt-1">
                     {num(leasedRentRoll)} XAF
                   </div>
                   <span className="text-[11px] text-emerald-600 font-bold">
@@ -386,17 +428,17 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
+                <div className="min-w-0 p-3.5 sm:p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
                   <span className="text-xs text-[#747780] font-semibold block">{t('console.verifiedBuildings')}</span>
-                  <div className="text-2xl font-extrabold text-[#002044] mt-1">
+                  <div className="text-xl sm:text-2xl font-extrabold text-[#002044] mt-1">
                     {t('console.propertiesCount', { count: num(buildings.length) })}
                   </div>
                   <span className="text-[11px] text-[#ff9827] font-bold">{t('console.tfAudited', { percent: num(verifiedPct) })}</span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
+                <div className="min-w-0 p-3.5 sm:p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
                   <span className="text-xs text-[#747780] font-semibold block">{t('console.occupancyRate')}</span>
-                  <div className="text-2xl font-extrabold text-[#002044] mt-1">
+                  <div className="text-xl sm:text-2xl font-extrabold text-[#002044] mt-1">
                     {t('console.percent', { value: num(avgOccupancy) })}
                   </div>
                   <span className="text-[11px] text-[#002044] font-bold">
@@ -529,7 +571,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                   </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-2xl border border-[#eaedff]">
+                <div className="hidden md:block overflow-x-auto rounded-2xl border border-[#eaedff]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#f2f3ff] text-[#43474f] font-bold border-b border-[#eaedff]">
                       <tr>
@@ -550,55 +592,45 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                               {tx.buildingName} • {tx.unitNumber}
                             </div>
                           </td>
-                          <td className="p-3.5">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                                tx.method === 'MTN MoMo'
-                                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                  : 'bg-orange-100 text-orange-900 border border-orange-300'
-                              }`}
-                            >
-                              {tx.method}
-                            </span>
-                          </td>
+                          <td className="p-3.5">{methodBadge(tx)}</td>
                           <td className="p-3.5 font-extrabold text-[#002044]">
                             {num(tx.amountXAF)} XAF
                           </td>
                           <td className="p-3.5 text-[#747780]">{formatDateTime(tx.date, locale)}</td>
-                          <td className="p-3.5">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                tx.status === 'Completed'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : tx.status === 'Escrow_Locked'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-rose-100 text-rose-800'
-                              }`}
-                            >
-                              {label('enums.txStatus', tx.status)}
-                            </span>
-                          </td>
-                          <td className="p-3.5">
-                            {tx.status === 'Completed' ? (
-                              <button
-                                onClick={() => handleDownloadReceipt(tx.id)}
-                                aria-label={t('console.downloadReceipt', { ref: tx.txRef })}
-                                className="text-[#0f3563] hover:underline font-semibold flex items-center gap-1"
-                              >
-                                <FileText className="w-3.5 h-3.5 text-[#ff9827]" aria-hidden="true" />
-                                <span>{t('console.pdf')}</span>
-                              </button>
-                            ) : (
-                              <span className="text-[11px] text-[#747780]" title={t('console.receiptPending')}>
-                                —
-                              </span>
-                            )}
-                          </td>
+                          <td className="p-3.5">{statusBadge(tx)}</td>
+                          <td className="p-3.5">{receiptAction(tx)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Phones: one card per payment instead of a 6-column table */}
+                <ul className="md:hidden space-y-2.5">
+                  {transactions.map((tx) => (
+                    <li key={tx.id} className="p-3.5 rounded-2xl border border-[#eaedff] bg-white">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold text-sm text-[#002044] truncate">{tx.tenantName}</div>
+                          <div className="text-[11px] text-[#747780] truncate">
+                            {tx.buildingName} • {tx.unitNumber}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="font-extrabold text-sm text-[#002044] whitespace-nowrap">{num(tx.amountXAF)} XAF</div>
+                          <div className="text-[11px] text-[#747780]">{formatDateTime(tx.date, locale)}</div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mt-2.5 text-xs">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {methodBadge(tx)}
+                          {statusBadge(tx)}
+                        </div>
+                        {receiptAction(tx)}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               {/* Record a rent payment against a unit (reconciles its balance) */}
