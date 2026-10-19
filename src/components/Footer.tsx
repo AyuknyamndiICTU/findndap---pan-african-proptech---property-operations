@@ -18,11 +18,11 @@ export const Footer: React.FC<FooterProps> = ({
   const rcApk = APK_BUILDS.rc;
 
   return (
-    <footer className="bg-[#002044] text-white pt-16 pb-12 border-t border-white/10">
+    <footer className="bg-[#002044] text-white pt-12 sm:pt-16 pb-28 border-t border-white/10">
       <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-white/10">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-8 sm:gap-10 pb-10 sm:pb-12 border-b border-white/10">
           {/* Column 1: Brand & Overview */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="col-span-2 space-y-4">
             <BrandLogo size="lg" textColor="white" />
             <p className="text-sm text-[#d5e3ff] leading-relaxed max-w-sm">
               {t('footer.about')}
@@ -48,32 +48,32 @@ export const Footer: React.FC<FooterProps> = ({
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff9827]">
               {t('footer.landlordSolutions')}
             </h4>
-            <ul className="space-y-2 text-xs text-[#d5e3ff]">
+            <ul className="space-y-0.5 sm:space-y-2 text-[13px] sm:text-xs text-[#d5e3ff]">
               <li>
                 <button
                   onClick={onOpenLandlordConsole}
-                  className="hover:text-white transition-colors"
+                  className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors"
                 >
                   {t('footer.liveConsole')}
                 </button>
               </li>
               <li>
-                <a href="#features" className="hover:text-white transition-colors">
+                <a href="#features" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.momoCollection')}
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-white transition-colors">
+                <a href="#features" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.bulkSms')}
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-white transition-colors">
+                <a href="#features" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.maintenance')}
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-white transition-colors">
+                <a href="#features" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.pricing')}
                 </a>
               </li>
@@ -85,32 +85,32 @@ export const Footer: React.FC<FooterProps> = ({
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff9827]">
               {t('footer.agentPortal')}
             </h4>
-            <ul className="space-y-2 text-xs text-[#d5e3ff]">
+            <ul className="space-y-0.5 sm:space-y-2 text-[13px] sm:text-xs text-[#d5e3ff]">
               <li>
                 <button
                   onClick={onOpenAgentModal}
-                  className="hover:text-white transition-colors"
+                  className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors"
                 >
                   {t('footer.registerAgent')}
                 </button>
               </li>
               <li>
-                <a href="#agent-portal" className="hover:text-white transition-colors">
+                <a href="#agent-portal" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.tfVerification')}
                 </a>
               </li>
               <li>
-                <a href="#agent-portal" className="hover:text-white transition-colors">
+                <a href="#agent-portal" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.registrationStudio')}
                 </a>
               </li>
               <li>
-                <a href="#agent-portal" className="hover:text-white transition-colors">
+                <a href="#agent-portal" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.fraudPolicy')}
                 </a>
               </li>
               <li>
-                <a href="#agent-portal" className="hover:text-white transition-colors">
+                <a href="#agent-portal" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.commissionPayouts')}
                 </a>
               </li>
@@ -122,14 +122,14 @@ export const Footer: React.FC<FooterProps> = ({
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff9827]">
               {t('footer.developerHub')}
             </h4>
-            <ul className="space-y-2 text-xs text-[#d5e3ff]">
+            <ul className="space-y-0.5 sm:space-y-2 text-[13px] sm:text-xs text-[#d5e3ff]">
               <li>
                 <button
                   type="button"
                   onClick={() => downloadApk(stableApk)}
                   disabled={!stableApk}
                   aria-disabled={!stableApk}
-                  className={`transition-colors flex items-center gap-1.5 font-semibold text-[#ff9827] ${
+                  className={`transition-colors flex items-start gap-1.5 text-left py-1.5 sm:py-0 font-semibold text-[#ff9827] ${
                     stableApk ? 'hover:text-white' : 'opacity-50 cursor-not-allowed'
                   }`}
                 >
@@ -149,7 +149,7 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={() => downloadApk(rcApk)}
                   disabled={!rcApk}
                   aria-disabled={!rcApk}
-                  className={`transition-colors ${rcApk ? 'hover:text-white' : 'opacity-50 cursor-not-allowed'}`}
+                  className={`transition-colors text-left py-1.5 sm:py-0 ${rcApk ? 'hover:text-white' : 'opacity-50 cursor-not-allowed'}`}
                 >
                   {rcApk
                     ? rcApk.version
@@ -159,17 +159,17 @@ export const Footer: React.FC<FooterProps> = ({
                 </button>
               </li>
               <li>
-                <a href="#developer-sandbox" className="hover:text-white transition-colors">
+                <a href="#developer-sandbox" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.momoSandbox')}
                 </a>
               </li>
               <li>
-                <a href="#developer-sandbox" className="hover:text-white transition-colors">
+                <a href="#developer-sandbox" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.orangeEndpoints')}
                 </a>
               </li>
               <li>
-                <a href="#developer-sandbox" className="hover:text-white transition-colors">
+                <a href="#developer-sandbox" className="inline-block py-1.5 sm:py-0 text-left hover:text-white transition-colors">
                   {t('footer.pipeline')}
                 </a>
               </li>
