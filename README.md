@@ -308,6 +308,95 @@ Run **Node.js 22 or newer**. Check with `node -v` and update from [nodejs.org](h
 
 ---
 
+## 🚀 Deploying to Vercel + Neon
+
+The app deploys to Vercel as a static frontend (served from Vercel's CDN) plus **one Node.js Vercel Function** that runs the whole Express API. All data, including agent ID documents, lives in a **Neon Postgres** database. Nothing is stored on Vercel's servers.
+
+```text
+Browser ──► Vercel CDN (dist/: HTML, JS, CSS)
+        └─► /api/*  ──► Vercel Function (server/vercel.ts → Express app) ──► Neon Postgres
+```
+
+`npm run build` does everything needed. On Vercel it detects the `VERCEL` environment variable and writes the [Build Output API](https://vercel.com/docs/build-output-api) folder `.vercel/output` itself: the frontend as static files, and the API bundled with all its dependencies into a single function. `vercel.json` only tells Vercel to run that build.
+
+### Step A: Push the code to GitHub
+
+Vercel deploys from your Git repository. Commit and push your latest code:
+
+```bash
+git add -A
+git commit -m "Prepare Vercel + Neon deployment"
+git push
+```
+
+`.env` is git-ignored, so your passwords are **not** pushed. You'll enter them in Vercel in Step D.
+
+### Step B: Import the project into Vercel
+
+1. Sign in at [vercel.com](https://vercel.com/) (use **Continue with GitHub**).
+2. Click **Add New… → Project**.
+3. Find your repository in the list and click **Import**. If it's missing, click **Adjust GitHub App Permissions** and give Vercel access to it.
+4. On the **Configure Project** screen:
+   - **Framework Preset**: leave it as Vercel shows it (`vercel.json` sets it to *Other*).
+   - **Root Directory**: leave as `./`.
+   - **Build and Output Settings**: leave everything off/default (`vercel.json` sets the build command to `npm run build`).
+5. **Don't click Deploy yet.** The first deploy works best once the database and variables exist. If you already clicked it, that's fine: the API will show errors until Steps C and D are done, then you redeploy (Step E).
+
+### Step C: Create the Neon database from Vercel
+
+1. In your new Vercel project, open the **Storage** tab.
+2. Click **Create Database** (or **Connect Database → Create New**), choose **Neon** (Serverless Postgres), and click **Continue**.
+   - If asked, choose **Create New Neon Account** and accept the terms. Billing goes through Vercel; the free plan is enough to start.
+3. Pick a **region close to your users and to your Vercel functions**. Vercel functions run in Washington D.C. (`iad1`) by default; for Cameroon users, choose a European region such as **Frankfurt (eu-central-1)** for Neon, and set Vercel's function region to Frankfurt too (**Settings → Functions → Function Region → `fra1`**).
+4. Name the database (e.g. `findndap`) and click **Create**.
+5. On **Connect Project**, select your project and tick **Production**, **Preview** and **Development**, then click **Connect**.
+   - Optional: under **Advanced Options**, enabling **Preview** gives every preview deployment its own copy of the database.
+
+Vercel now has a `DATABASE_URL` environment variable pointing at Neon's pooled connection. The app reads it automatically.
+
+### Step D: Add the app's environment variables
+
+Open **Settings → Environment Variables** and add these. Tick **Production** and **Preview** for each. Use **different, strong passwords** from your local `.env`, and click **Save** after each one.
+
+| Key | Value | Required |
+| :--- | :--- | :--- |
+| `ADMIN_PASSWORD` | A strong password, at least 8 characters (generate one with `node -e "console.log(require('crypto').randomBytes(12).toString('base64url'))"`) | Yes |
+| `ADMIN_USERNAME` | e.g. `admin` (defaults to `admin`) | No |
+| `AGENT_ACCOUNTS` | e.g. `beatrice:Strong-Pass-1,etienne:Strong-Pass-2` | No |
+| `MOMO_WEBHOOK_SECRET` | A long random string (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) | For the payment webhook |
+| `SEED_DEMO_DATA` | `false` to start with an empty database instead of the demo buildings and payments | No |
+| `VITE_APK_URL` / `VITE_APK_VERSION` | The real Android app link, once you have one | No |
+
+You don't need `PORT` or `DATABASE_URL` here: Vercel ignores the first and Step C already set the second.
+
+### Step E: Deploy
+
+- If you haven't deployed yet, go back to the project and click **Deploy**.
+- If you already deployed, open **Deployments**, click **⋯** on the latest one and choose **Redeploy**. Variables are only picked up by new deployments.
+
+When the build finishes, open the site URL (e.g. `https://findndap.vercel.app`). On the **first request** the API creates the tables, loads the demo data (unless `SEED_DEMO_DATA=false`) and creates the accounts. That first request takes a few seconds longer.
+
+### Step F: Check it works
+
+1. Open `https://<your-site>/api/health`. It should show `{"status":"ok",…}`.
+2. Open the site, click **Sign in**, and log in as the admin you set in Step D.
+3. If something fails, open the Vercel project → **Logs** (or **Deployments → the deployment → Functions**). Start-up problems are logged with `[auth]` or `[api]` prefixes, or as "DATABASE_URL is not set".
+
+### After deployment
+
+- **Every `git push` deploys automatically**: pushes to the main branch go to production, other branches get preview URLs.
+- **Changing accounts or passwords**: edit the variables in **Settings → Environment Variables**, then **Redeploy**. Accounts sync from the variables when each new function instance starts; a removed account is disabled immediately and its sessions are revoked.
+- **Changing `VITE_APK_URL`** also needs a redeploy, because it is built into the frontend.
+- **Your local `npm run dev`** keeps using the `DATABASE_URL` in `.env`. Point it at a separate Neon branch (Step 5 above) so testing never changes production data. To pull the Vercel variables into a local file instead, use the [Vercel CLI](https://vercel.com/docs/cli/env): `npx vercel env pull .env.development.local`.
+
+### Limits to know about
+
+- **Agent ID documents are limited to 3 MB**: Vercel rejects requests larger than 4.5 MB, and a file grows by about a third when uploaded. Documents are stored in the database.
+- **The in-browser payment simulator** in the Developer Hub is disabled on production deployments. Real payments arrive through `POST /api/momo/webhook` (with `X-Webhook-Secret`).
+- **Function time limit**: API requests are limited to 30 seconds (set in `scripts/build.mjs`); normal requests take well under a second.
+
+---
+
 ## 📱 Mobile App API Reference & Configuration Guide
 
 FindNdap features a built-in, production-ready full-stack Express REST API (`server.ts`) directly integrated with the application. This API provides live data, dynamically recomputed portfolio analytics, and automated ledger operations that can be linked to any mobile application (React Native, Flutter, Swift/iOS, or Kotlin/Android).
@@ -584,7 +673,7 @@ Missing or expired token → `401`; wrong role → `403`. Tokens last 12 hours a
 
 ##### `POST /api/agent/kyc` (agent)
 - **Description**: Submits (or updates) a certification application. It always goes to `in-review`; agents can never certify themselves. Certified agents get `409` (an administrator must revoke first).
-- **Rules**: `fullName`, `agencyName`, `licenseId` (*RCCM/NUI*) and `city` are required; `momoNumber` must be a Cameroon mobile number (9 digits starting with `6`, optional `+237`). An ID document is required on the first submission: `document: { name, mimeType, dataBase64 }` with `mimeType` `application/pdf`, `image/jpeg` or `image/png`, at most 5 MB; the file's content must match its type.
+- **Rules**: `fullName`, `agencyName`, `licenseId` (*RCCM/NUI*) and `city` are required; `momoNumber` must be a Cameroon mobile number (9 digits starting with `6`, optional `+237`). An ID document is required on the first submission: `document: { name, mimeType, dataBase64 }` with `mimeType` `application/pdf`, `image/jpeg` or `image/png`, at most 3 MB (Vercel caps request bodies at 4.5 MB); the file's content must match its type.
 
 ##### `GET /api/admin/agents` (admin)
 - **Description**: Lists all applications, those awaiting review first.
@@ -792,7 +881,7 @@ Inspired by cutting-edge interactive product showcases (Zenith, CSWatch, Vibram,
 ---
 
 ### 12. Accounts, Persistence, Real Certification, Receipts & Bilingual Interface
-- **SQLite persistence** (`server/db.ts`): all data is stored in `data/findndap.db` and survives restarts; demo data is seeded only into an empty database. Record ids are now random (`tx-3f9a1c0b7e2d`) instead of time-based, and timestamps are stored as ISO dates.
+- **SQLite persistence** *(replaced by Neon Postgres in 13)*: all data is stored in `data/findndap.db` and survives restarts; demo data is seeded only into an empty database. Record ids are now random (`tx-3f9a1c0b7e2d`) instead of time-based, and timestamps are stored as ISO dates.
 - **Role-based logins** (`server/auth.ts`): an administrator account and agent accounts configured in `.env`; scrypt password hashing, 12-hour session tokens (stored hashed), login rate limiting. Reads stay public; every write requires the right role.
 - **Real certification**: agents upload a PDF/JPG/PNG ID document (type checked against the file's content) and apply; administrators review the document and approve (badge issued) or reject with a reason in the console's new *Agent Approvals* tab. The demo certification toggle, "Reset Demo State", the pre-certified demo agent and the fake quick-fill document were removed.
 - **Console**: read-only for visitors; new work-order form; real PDF receipts (`GET /api/transactions/:id/receipt`); payments recorded against a unit's id.
@@ -801,6 +890,15 @@ Inspired by cutting-edge interactive product showcases (Zenith, CSWatch, Vibram,
 - **English/French**: the EN/FR switch translates the whole interface; server messages follow the chosen language (`Accept-Language`).
 - **Accessibility**: Escape closes dialogs, the hero phone card works with the keyboard, icon-only dock buttons have labels, and account avatars show initials instead of a stock photo.
 - **Tooling**: `npm run setup` creates `.env` with generated secrets; all npm scripts call Node directly so they work on every OS and in folders containing `&`; `npm start` now really runs in production mode.
+
+---
+
+### 13. Vercel + Neon Deployment
+- **Postgres instead of SQLite** (`server/db.ts`): the app now uses Neon serverless Postgres through `pg` with a small connection pool, as Neon recommends for Vercel Fluid compute (`attachDatabasePool` from `@vercel/functions` closes idle connections before a function is suspended). `DATABASE_URL` replaces `DATA_DIR`; `better-sqlite3` was removed.
+- **Safe start-up on many instances**: schema creation, first-run demo seeding (`SEED_DEMO_DATA`) and account sync run under a Postgres advisory lock, so serverless instances starting at the same time never conflict. Uniqueness (Titre Foncier, unit numbers, usernames) is enforced by the database; racing duplicates get `409`.
+- **Nothing on disk**: agent ID documents are stored in the database (`BYTEA`) with a 3 MB limit (Vercel's request limit is 4.5 MB); login rate limiting is stored in the database so it holds across instances.
+- **App split for serverless**: `server/app.ts` builds the Express API, `server/vercel.ts` exposes it as a Vercel Function, and `server.ts` stays the local entry point. `scripts/build.mjs` writes the Vercel Build Output (`.vercel/output`) with the API bundled into one self-contained file, avoiding Vercel's per-file tracing of TypeScript imports.
+- **Docs**: click-by-click Vercel + Neon deployment guide above; `.env.example` now documents `DATABASE_URL`.
 
 ---
 

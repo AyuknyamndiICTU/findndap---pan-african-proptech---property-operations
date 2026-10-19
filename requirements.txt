@@ -12,7 +12,8 @@
 # ------------------------------------------------------------------------------
 # 1. SYSTEM & RUNTIME PREREQUISITES
 # ------------------------------------------------------------------------------
-# Node.js: >= 22.0.0 (required by better-sqlite3)
+# Node.js: >= 22.0.0
+# Database: a Neon Postgres database (DATABASE_URL in .env)
 # NPM:     >= 9.0.0 (Comes bundled with Node.js)
 # OS:      Windows 10/11, macOS (Intel/Apple Silicon), or Linux (Ubuntu, Debian, Fedora, Arch)
 # Browsers: Google Chrome 90+, Mozilla Firefox 88+, Safari 14+, Microsoft Edge 90+
@@ -29,7 +30,8 @@ motion>=12.23.0
 @vitejs/plugin-react>=5.0.0
 express>=4.21.2
 dotenv>=17.2.3
-better-sqlite3>=13.0.0
+pg>=8.13.0
+@vercel/functions>=3.0.0
 
 # ------------------------------------------------------------------------------
 # 3. DEVELOPMENT & BUILD DEPENDENCIES
@@ -39,7 +41,7 @@ typescript>=5.8.0
 @types/react>=19.0.0
 @types/react-dom>=19.0.0
 @types/express>=4.17.21
-@types/better-sqlite3>=9.6.0
+@types/pg>=8.11.0
 tailwindcss>=4.1.0
 autoprefixer>=10.4.21
 esbuild>=0.25.0
@@ -56,8 +58,6 @@ tsx>=4.21.0
 #
 # Using PNPM:
 #   pnpm install
-#
-# (Bun is not supported: better-sqlite3 is a native Node.js module.)
 #
 # First-time configuration (creates .env with an admin password and webhook secret):
 #   npm run setup
