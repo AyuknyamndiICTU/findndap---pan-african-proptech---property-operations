@@ -163,13 +163,13 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
       >
         {/* Header */}
         <div className="bg-[#002044] text-white px-4 py-3 sm:p-6 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-6 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#ff9827] text-white flex items-center justify-center shadow-sm">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="hidden sm:flex w-10 h-10 shrink-0 rounded-xl bg-[#ff9827] text-white items-center justify-center shadow-sm">
               <Building2 className="w-5 h-5" aria-hidden="true" />
             </div>
             <div>
               <h2 id="building-modal-title" className="text-base sm:text-xl font-extrabold tracking-tight">{t('buildingModal.title')}</h2>
-              <span className="text-xs text-[#d5e3ff]">
+              <span className="hidden sm:inline text-xs text-[#d5e3ff]">
                 {t('buildingModal.subtitle')}
               </span>
             </div>
