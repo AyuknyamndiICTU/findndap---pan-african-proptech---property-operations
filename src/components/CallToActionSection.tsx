@@ -16,9 +16,9 @@ export const CallToActionSection: React.FC<CallToActionSectionProps> = ({
   const apkBuild = APK_BUILDS.stable;
 
   return (
-    <section className="py-20 px-4 md:px-8 lg:px-12 bg-white relative overflow-hidden">
+    <section className="py-12 sm:py-20 px-4 md:px-8 lg:px-12 bg-white relative overflow-hidden">
       <div className="max-w-7xl mx-auto">
-        <div className="rounded-3xl bg-gradient-to-r from-[#002044] via-[#0f3563] to-[#002044] p-8 sm:p-12 lg:p-16 text-white text-center relative shadow-2xl overflow-hidden">
+        <div className="rounded-3xl bg-gradient-to-r from-[#002044] via-[#0f3563] to-[#002044] px-5 py-8 sm:p-12 lg:p-16 text-white text-center relative shadow-2xl overflow-hidden">
           {/* Background circles */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-[#ff9827]/15 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/5 rounded-full blur-3xl pointer-events-none" />
@@ -29,11 +29,11 @@ export const CallToActionSection: React.FC<CallToActionSectionProps> = ({
               {t('cta.eyebrow')}
             </div>
 
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight mb-6 leading-tight">
+            <h2 className="text-[1.75rem] sm:text-4xl lg:text-5xl font-extrabold tracking-tight mb-4 sm:mb-6 leading-tight">
               {t('cta.title')}
             </h2>
 
-            <p className="text-base sm:text-lg text-[#d5e3ff] mb-10 leading-relaxed max-w-2xl mx-auto">
+            <p className="text-sm sm:text-lg text-[#d5e3ff] mb-7 sm:mb-10 leading-relaxed max-w-2xl mx-auto">
               {t('cta.body')}
             </p>
 

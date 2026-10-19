@@ -106,7 +106,7 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
   }'`;
 
   return (
-    <section id="developer-sandbox" className="py-24 px-4 md:px-8 lg:px-12 bg-[#002044] text-white relative overflow-hidden">
+    <section id="developer-sandbox" className="py-14 sm:py-24 px-4 md:px-8 lg:px-12 bg-[#002044] text-white relative overflow-hidden scroll-mt-24">
       {/* Texture Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#002044] via-[#0f3563] to-[#001733] opacity-95" />
       <div className="absolute inset-0 futuristic-grid-dark opacity-30 pointer-events-none" />
@@ -114,7 +114,7 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
 
       <div className="max-w-7xl mx-auto relative z-10">
         {/* Section Heading */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 sm:mb-12 gap-4 sm:gap-6">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 mb-3">
               <Terminal className="w-3.5 h-3.5 text-[#ff9827]" />
@@ -122,7 +122,7 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
                 {t('sandbox.eyebrow')}
               </span>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+            <h2 className="text-[1.75rem] sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
               {t('sandbox.title')}
             </h2>
           </div>
@@ -132,13 +132,13 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
         </div>
 
         {/* Main Sandbox Box */}
-        <div className="rounded-3xl bg-white/5 backdrop-blur-xl p-6 sm:p-8 lg:p-10 shadow-2xl border border-white/15">
+        <div className="rounded-2xl sm:rounded-3xl bg-white/5 backdrop-blur-xl p-3 sm:p-8 lg:p-10 shadow-2xl border border-white/15">
           {/* Tabs & Status */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-8 border-b border-white/10">
-            <div className="inline-flex rounded-2xl bg-[#001733] p-1.5 border border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 pb-4 sm:pb-6 mb-5 sm:mb-8 border-b border-white/10">
+            <div className="grid grid-cols-3 w-full sm:w-auto sm:inline-flex rounded-2xl bg-[#001733] p-1 sm:p-1.5 border border-white/10">
               <button
                 onClick={() => setActiveTab('staging')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`px-2 sm:px-4 py-2.5 sm:py-2 rounded-xl text-[11px] sm:text-xs leading-tight font-bold transition-all ${
                   activeTab === 'staging'
                     ? 'bg-[#ff9827] text-white shadow-md'
                     : 'text-[#d5e3ff] hover:text-white'
@@ -148,7 +148,7 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
               </button>
               <button
                 onClick={() => setActiveTab('rc')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`px-2 sm:px-4 py-2.5 sm:py-2 rounded-xl text-[11px] sm:text-xs leading-tight font-bold transition-all ${
                   activeTab === 'rc'
                     ? 'bg-[#ff9827] text-white shadow-md'
                     : 'text-[#d5e3ff] hover:text-white'
@@ -158,7 +158,7 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
               </button>
               <button
                 onClick={() => setActiveTab('api')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`px-2 sm:px-4 py-2.5 sm:py-2 rounded-xl text-[11px] sm:text-xs leading-tight font-bold transition-all ${
                   activeTab === 'api'
                     ? 'bg-[#ff9827] text-white shadow-md'
                     : 'text-[#d5e3ff] hover:text-white'
@@ -182,13 +182,13 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
 
           {/* TAB 1: STAGING APK */}
           {activeTab === 'staging' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-center">
               {/* Download Card Left with 3D Tilt */}
               <div className="lg:col-span-7">
                 <FuturisticTiltCard
                   maxTilt={8}
                   borderLaser={true}
-                  className="p-6 rounded-3xl bg-gradient-to-br from-[#0f3563] to-[#002044] border border-white/15 shadow-xl"
+                  className="p-4 sm:p-6 rounded-3xl bg-gradient-to-br from-[#0f3563] to-[#002044] border border-white/15 shadow-xl"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -235,8 +235,8 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
                 </FuturisticTiltCard>
               </div>
 
-              {/* QR Code Sideload Right with 3D Tilt */}
-              <div className="lg:col-span-5">
+              {/* QR Code Sideload Right with 3D Tilt (desktop only: on a phone you download directly) */}
+              <div className="hidden lg:block lg:col-span-5">
                 <FuturisticTiltCard
                   maxTilt={10}
                   glareOpacity={0.2}
@@ -285,11 +285,11 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
 
           {/* TAB 2: RELEASE CANDIDATE */}
           {activeTab === 'rc' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-center">
               <div className="lg:col-span-7">
                 <FuturisticTiltCard
                   maxTilt={8}
-                  className="p-6 rounded-3xl bg-gradient-to-br from-[#0f3563] to-[#002044] border border-white/15"
+                  className="p-4 sm:p-6 rounded-3xl bg-gradient-to-br from-[#0f3563] to-[#002044] border border-white/15"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
@@ -336,7 +336,7 @@ export const DeveloperSandboxSection: React.FC<DeveloperSandboxSectionProps> = (
                 </FuturisticTiltCard>
               </div>
 
-              <div className="lg:col-span-5 bg-white/5 p-6 rounded-3xl border border-white/15 space-y-3 text-xs text-[#d5e3ff]">
+              <div className="lg:col-span-5 bg-white/5 p-4 sm:p-6 rounded-3xl border border-white/15 space-y-3 text-xs text-[#d5e3ff]">
                 <h4 className="font-bold text-sm text-white flex items-center gap-2">
                   <Zap className="w-4 h-4 text-[#ff9827]" />
                   {t('sandbox.easTitle')}
