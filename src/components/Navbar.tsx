@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrandLogo } from './BrandLogo';
-import { AgentKYC } from '../types';
+import { AgentKYC, AuthUser } from '../types';
+import { APK_BUILDS, downloadApk } from '../utils/apk';
+import { useI18n } from '../i18n/LanguageContext';
 import {
   ShieldCheck,
   UserCheck,
@@ -24,30 +26,61 @@ import {
   Radio,
   ExternalLink,
   CheckCircle2,
-  Info
+  Info,
+  LogIn,
+  LogOut,
+  Clock
 } from 'lucide-react';
-import { downloadFindNdapApk } from '../utils/apkGenerator';
 
 interface NavbarProps {
-  agentKYC: AgentKYC;
-  onToggleAgentMode: () => void;
+  user: AuthUser | null;
+  agentKYC: AgentKYC | null;
+  onSignIn: () => void;
+  onSignOut: () => void;
   onOpenBuildingModal: () => void;
   onOpenLandlordConsole: () => void;
+  onOpenApprovals: () => void;
   onOpenAgentModal: () => void;
 }
 
+const initialsOf = (name: string) =>
+  name
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join('') || '?';
+
 export const Navbar: React.FC<NavbarProps> = ({
+  user,
   agentKYC,
-  onToggleAgentMode,
+  onSignIn,
+  onSignOut,
   onOpenBuildingModal,
   onOpenLandlordConsole,
+  onOpenApprovals,
   onOpenAgentModal,
 }) => {
+  const { t, lang, setLang } = useI18n();
+  const isCertifiedAgent = user?.role === 'agent' && agentKYC?.status === 'certified';
+  const displayName = (user?.role === 'agent' && agentKYC?.fullName) || user?.username || '';
+  const roleLabel =
+    user?.role === 'admin'
+      ? t('navbar.roleAdmin')
+      : agentKYC?.status === 'certified'
+      ? t('navbar.roleCertified')
+      : agentKYC?.status === 'in-review'
+      ? t('navbar.roleInReview')
+      : agentKYC?.status === 'rejected'
+      ? t('navbar.roleRejected')
+      : t('navbar.roleUnverified');
+  const showGetCertified = !(user?.role === 'admin' || isCertifiedAgent);
+  const stableApk = APK_BUILDS.stable;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<'solutions' | 'features' | 'developer' | 'agent' | null>(null);
-  const [language, setLanguage] = useState<'EN' | 'FR'>('EN');
   const [isScrolled, setIsScrolled] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const agentMenuRef = useRef<HTMLDivElement>(null);
 
   // Monitor scroll state for elevation transition
   useEffect(() => {
@@ -61,7 +94,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const insideNav = dropdownRef.current?.contains(target);
+      const insideAgentMenu = agentMenuRef.current?.contains(target);
+      if (!insideNav && !insideAgentMenu) {
         setActiveDropdown(null);
       }
     };
@@ -86,13 +122,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span>MOMO &amp; ORANGE GATEWAY ONLINE</span>
+            <span>{t('navbar.gatewayOnline')}</span>
           </div>
 
           {/* Regulatory & Cadastral Notice */}
           <span className="hidden md:inline-flex items-center gap-1.5 text-white/70">
             <ShieldCheck className="w-3.5 h-3.5 text-[#ff9827]" />
-            <span>CEMAC &amp; OHADA Compliant Leases • Titre Foncier (TF) Verification Engine</span>
+            <span>{t('navbar.complianceNotice')}</span>
           </span>
         </div>
 
@@ -101,39 +137,53 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="hidden sm:flex items-center gap-1.5 text-white/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md text-[10px]">
             <span className="text-[#ff9827] font-bold">XAF</span>
             <span className="text-white/40">|</span>
-            <span>FCFA (Central Africa)</span>
+            <span>{t('navbar.currencyRegion')}</span>
           </div>
 
           {/* Bilingual Switcher */}
           <div className="flex items-center bg-white/10 rounded-md p-0.5 border border-white/15 text-[10px] font-bold">
             <button
-              onClick={() => setLanguage('EN')}
+              onClick={() => setLang('en')}
               className={`px-1.5 py-0.5 rounded transition-colors ${
-                language === 'EN' ? 'bg-[#ff9827] text-white' : 'text-white/70 hover:text-white'
+                lang === 'en' ? 'bg-[#ff9827] text-white' : 'text-white/70 hover:text-white'
               }`}
-              title="English (Official)"
+              title={t('navbar.langEnglishTitle')}
+              aria-label={t('navbar.langEnglish')}
+              aria-pressed={lang === 'en'}
+              lang="en"
             >
               EN
             </button>
             <button
-              onClick={() => setLanguage('FR')}
+              onClick={() => setLang('fr')}
               className={`px-1.5 py-0.5 rounded transition-colors ${
-                language === 'FR' ? 'bg-[#ff9827] text-white' : 'text-white/70 hover:text-white'
+                lang === 'fr' ? 'bg-[#ff9827] text-white' : 'text-white/70 hover:text-white'
               }`}
-              title="Français (Officiel)"
+              title={t('navbar.langFrenchTitle')}
+              aria-label={t('navbar.langFrench')}
+              aria-pressed={lang === 'fr'}
+              lang="fr"
             >
               FR
             </button>
           </div>
 
-          {/* Instant Staging APK trigger */}
+          {/* Android APK download (only when a real build is configured) */}
           <button
-            onClick={() => downloadFindNdapApk('1.4.2')}
-            className="hidden lg:inline-flex items-center gap-1.5 bg-[#ff9827]/20 hover:bg-[#ff9827]/30 text-[#ffb05c] hover:text-white border border-[#ff9827]/40 px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all shadow-xs"
-            title="Direct Download FindNdap Android APK v1.4.2"
+            onClick={() => downloadApk(stableApk)}
+            disabled={!stableApk}
+            aria-disabled={!stableApk}
+            className="hidden lg:inline-flex items-center gap-1.5 bg-[#ff9827]/20 hover:bg-[#ff9827]/30 text-[#ffb05c] hover:text-white border border-[#ff9827]/40 px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#ff9827]/20"
+            title={stableApk ? t('navbar.apkDownloadTitle') : t('navbar.apkUnavailable')}
           >
-            <Download className="w-3 h-3" />
-            <span>Staging APK v1.4.2</span>
+            <Download className="w-3 h-3" aria-hidden="true" />
+            <span>
+              {stableApk
+                ? stableApk.version
+                  ? t('navbar.apkButtonVersion', { version: stableApk.version })
+                  : t('navbar.apkButton')
+                : t('navbar.apkUnavailable')}
+            </span>
           </button>
         </div>
       </div>
@@ -165,7 +215,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       : 'hover:bg-[#eaedff] text-[#002044]'
                   }`}
                 >
-                  <span>Solutions</span>
+                  <span>{t('navbar.solutions')}</span>
                   <ChevronDown
                     className={`w-3.5 h-3.5 transition-transform duration-200 ${
                       activeDropdown === 'solutions' ? 'rotate-180 text-[#ff9827]' : 'text-[#747780]'
@@ -177,7 +227,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {activeDropdown === 'solutions' && (
                   <div className="absolute top-full left-0 mt-2 w-[420px] bg-white rounded-2xl shadow-2xl border border-[#002044]/15 p-4 grid grid-cols-1 gap-2.5 animate-in fade-in slide-in-from-top-2 z-50">
                     <div className="text-[10px] font-black uppercase tracking-wider text-[#ff9827] px-2 pt-1 flex items-center justify-between">
-                      <span>Ecosystem Workflows</span>
+                      <span>{t('navbar.ecosystemWorkflows')}</span>
                       <span className="text-[#747780] font-normal lowercase">Douala &amp; Yaoundé</span>
                     </div>
 
@@ -191,11 +241,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </div>
                       <div>
                         <div className="text-xs font-bold text-[#002044] flex items-center gap-1.5">
-                          <span>For Property Owners &amp; Landlords</span>
+                          <span>{t('navbar.forOwners')}</span>
                           <ArrowUpRight className="w-3 h-3 text-[#ff9827] opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                         <p className="text-[11px] text-[#5b6375] leading-snug mt-0.5">
-                          Automate MoMo collection, broadcast bulk SMS rent notices, and resolve maintenance tickets.
+                          {t('navbar.forOwnersDesc')}
                         </p>
                       </div>
                     </a>
@@ -210,11 +260,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </div>
                       <div>
                         <div className="text-xs font-bold text-[#002044] flex items-center gap-1.5">
-                          <span>For Certified Brokers &amp; Agents</span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">Accredited</span>
+                          <span>{t('navbar.forAgents')}</span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">{t('navbar.accredited')}</span>
                         </div>
                         <p className="text-[11px] text-[#5b6375] leading-snug mt-0.5">
-                          Verify Titre Foncier cadastral records, publish verified buildings, and earn secure commissions.
+                          {t('navbar.forAgentsDesc')}
                         </p>
                       </div>
                     </a>
@@ -222,7 +272,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="bg-[#eaedff]/60 rounded-xl p-2.5 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <Radio className="w-4 h-4 text-[#002044] animate-pulse" />
-                        <span className="font-semibold text-[#002044]">Try Live Landlord Simulator</span>
+                        <span className="font-semibold text-[#002044]">{t('navbar.trySimulator')}</span>
                       </div>
                       <button
                         onClick={() => {
@@ -231,7 +281,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         }}
                         className="bg-[#002044] text-white text-[11px] font-bold px-2.5 py-1 rounded-lg hover:bg-[#0f3563] transition-colors"
                       >
-                        Launch
+                        {t('navbar.launch')}
                       </button>
                     </div>
                   </div>
@@ -248,7 +298,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       : 'hover:bg-[#eaedff] text-[#002044]'
                   }`}
                 >
-                  <span>Features</span>
+                  <span>{t('navbar.features')}</span>
                   <ChevronDown
                     className={`w-3.5 h-3.5 transition-transform duration-200 ${
                       activeDropdown === 'features' ? 'rotate-180 text-[#ff9827]' : 'text-[#747780]'
@@ -265,10 +315,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <div className="flex items-center gap-2 text-[#002044] font-bold text-xs">
                         <CreditCard className="w-4 h-4 text-[#ff9827]" />
-                        <span>Automated MoMo Collection</span>
+                        <span>{t('navbar.featMomo')}</span>
                       </div>
                       <p className="text-[11px] text-[#5b6375] leading-tight">
-                        Instant MTN &amp; Orange Money ledger sync with zero manual reconciliation.
+                        {t('navbar.featMomoDesc')}
                       </p>
                     </a>
 
@@ -279,10 +329,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <div className="flex items-center gap-2 text-[#002044] font-bold text-xs">
                         <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                        <span>Cadastral Titre Foncier</span>
+                        <span>{t('navbar.featCadastre')}</span>
                       </div>
                       <p className="text-[11px] text-[#5b6375] leading-tight">
-                        Zero-fraud cadastral parcel lookup certified against land registry records.
+                        {t('navbar.featCadastreDesc')}
                       </p>
                     </a>
 
@@ -293,10 +343,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <div className="flex items-center gap-2 text-[#002044] font-bold text-xs">
                         <MessageSquare className="w-4 h-4 text-blue-600" />
-                        <span>Direct Bulk SMS</span>
+                        <span>{t('navbar.featSms')}</span>
                       </div>
                       <p className="text-[11px] text-[#5b6375] leading-tight">
-                        Send rent reminders and maintenance bulletins directly to tenant phones.
+                        {t('navbar.featSmsDesc')}
                       </p>
                     </a>
 
@@ -307,10 +357,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <div className="flex items-center gap-2 text-[#002044] font-bold text-xs">
                         <Wrench className="w-4 h-4 text-amber-600" />
-                        <span>Maintenance Triage</span>
+                        <span>{t('navbar.featMaintenance')}</span>
                       </div>
                       <p className="text-[11px] text-[#5b6375] leading-tight">
-                        4-stage work-order dispatch pipeline with vendor quotes and photos.
+                        {t('navbar.featMaintenanceDesc')}
                       </p>
                     </a>
                   </div>
@@ -322,7 +372,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 href="#agent-portal"
                 className="px-3 py-2 rounded-lg hover:bg-[#eaedff] text-[#002044] transition-colors"
               >
-                Agent Certification
+                {t('navbar.agentCertification')}
               </a>
 
               {/* Dropdown 3: Developer Hub */}
@@ -336,7 +386,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   <span className="flex items-center gap-1">
-                    <span>Developer Hub</span>
+                    <span>{t('navbar.developerHub')}</span>
                     <span className="bg-[#ff9827]/20 text-[#8e4f00] text-[10px] font-black px-1.5 py-0.2 rounded-full">
                       API
                     </span>
@@ -351,19 +401,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {activeDropdown === 'developer' && (
                   <div className="absolute top-full left-0 mt-2 w-[380px] bg-white rounded-2xl shadow-2xl border border-[#002044]/15 p-4 space-y-3 animate-in fade-in slide-in-from-top-2 z-50">
                     <div className="text-[10px] font-black uppercase tracking-wider text-[#002044] px-1">
-                      Integration Sandbox &amp; Testing
+                      {t('navbar.integrationSandbox')}
                     </div>
 
                     <a
-                      href="#developer-hub"
+                      href="#developer-sandbox"
                       onClick={closeDropdown}
                       className="flex items-center justify-between p-2.5 rounded-xl bg-[#faf8ff] hover:bg-[#eaedff] transition-all border border-[#002044]/5"
                     >
                       <div className="flex items-center gap-2.5">
                         <Activity className="w-4 h-4 text-[#ff9827]" />
                         <div>
-                          <div className="text-xs font-bold text-[#002044]">MoMo Webhook Simulator</div>
-                          <div className="text-[11px] text-[#5b6375]">Test payment payload callbacks</div>
+                          <div className="text-xs font-bold text-[#002044]">{t('navbar.webhookSimulator')}</div>
+                          <div className="text-[11px] text-[#5b6375]">{t('navbar.webhookSimulatorDesc')}</div>
                         </div>
                       </div>
                       <ArrowUpRight className="w-4 h-4 text-[#747780]" />
@@ -372,19 +422,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="p-3 rounded-xl bg-[#001733] text-white flex items-center justify-between">
                       <div className="space-y-0.5">
                         <div className="text-xs font-bold flex items-center gap-1.5 text-[#ff9827]">
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Android Staging APK</span>
+                          <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                          <span>{t('navbar.androidApp')}</span>
                         </div>
-                        <div className="text-[10px] text-white/70">v1.4.2 • Build 142 • Signed Package</div>
+                        <div className="text-[10px] text-white/70">
+                          {stableApk
+                            ? stableApk.version
+                              ? t('navbar.versionLabel', { version: stableApk.version })
+                              : t('navbar.latestBuild')
+                            : t('navbar.notAvailableYet')}
+                        </div>
                       </div>
                       <button
                         onClick={() => {
                           closeDropdown();
-                          downloadFindNdapApk('1.4.2');
+                          downloadApk(stableApk);
                         }}
-                        className="bg-[#ff9827] hover:bg-[#8e4f00] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-xs"
+                        disabled={!stableApk}
+                        className="bg-[#ff9827] hover:bg-[#8e4f00] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Download
+                        {t('navbar.download')}
                       </button>
                     </div>
                   </div>
@@ -400,129 +457,175 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="navbar-landlord-console-btn"
               onClick={onOpenLandlordConsole}
               className="relative group flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-[#002044] to-[#0f3563] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all hover:scale-[1.02] border border-white/10"
-              title="Launch Live Landlord Mobile Operations Console"
+              title={t('navbar.consoleButtonTitle')}
             >
               <div className="w-5 h-5 rounded-lg bg-[#ff9827] text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Smartphone className="w-3.5 h-3.5" />
               </div>
-              <span>Landlord Console</span>
+              <span>{t('navbar.landlordConsole')}</span>
               <span className="flex items-center gap-1 bg-white/20 text-[#d5e3ff] text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Live</span>
+                <span>{t('navbar.live')}</span>
               </span>
             </button>
 
-            {/* 2. Certified Agent Identity Pill & Interactive Role Switcher */}
-            <div className="relative">
-              {agentKYC.isCertified ? (
-                <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-300/80 p-1 pl-2 rounded-xl shadow-xs">
+            {/* 2. Account: sign in, or the signed-in user's menu */}
+            <div className="relative" ref={agentMenuRef}>
+              {!user ? (
+                <button
+                  id="navbar-sign-in-btn"
+                  onClick={onSignIn}
+                  className="flex items-center gap-1.5 bg-[#eaedff] hover:bg-[#dbe2ff] text-[#002044] text-xs font-bold px-3 py-2 rounded-xl border border-[#c3c6d0]/60 transition-all hover:scale-[1.01]"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-[#ff9827]" aria-hidden="true" />
+                  <span>{t('navbar.signIn')}</span>
+                </button>
+              ) : (
+                <div
+                  className={`flex items-center gap-1 p-1 pl-2 rounded-xl shadow-xs border ${
+                    isCertifiedAgent || user.role === 'admin'
+                      ? 'bg-emerald-50 border-emerald-300/80'
+                      : 'bg-amber-50 border-amber-300/80'
+                  }`}
+                >
                   <button
                     onClick={() => handleDropdownToggle('agent')}
-                    className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 hover:text-emerald-950 transition-colors pr-1"
-                    title="Certified Agent Details"
+                    aria-haspopup="true"
+                    aria-expanded={activeDropdown === 'agent'}
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#002044] pr-1"
+                    title={t('navbar.account')}
                   >
-                    <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="max-w-[90px] truncate">{agentKYC.fullName.split(' ')[0]}</span>
-                    <ChevronDown className="w-3 h-3 text-emerald-700" />
+                    <span
+                      aria-hidden="true"
+                      className={`w-6 h-6 rounded-full text-white text-[10px] font-black flex items-center justify-center shrink-0 ${
+                        isCertifiedAgent || user.role === 'admin' ? 'bg-emerald-600' : 'bg-amber-600'
+                      }`}
+                    >
+                      {initialsOf(displayName)}
+                    </span>
+                    <span className="max-w-[110px] truncate">{displayName.split(' ')[0]}</span>
+                    <ChevronDown className="w-3 h-3" aria-hidden="true" />
                   </button>
 
-                  <button
-                    id="navbar-register-building-btn"
-                    onClick={onOpenBuildingModal}
-                    className="inline-flex items-center gap-1 bg-[#002044] hover:bg-[#0f3563] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-all shadow-xs"
-                    title="Only accredited certified agents can register properties"
-                  >
-                    <Building2 className="w-3 h-3 text-[#ff9827]" />
-                    <span>+ Building</span>
-                  </button>
+                  {isCertifiedAgent && (
+                    <button
+                      id="navbar-register-building-btn"
+                      onClick={onOpenBuildingModal}
+                      className="inline-flex items-center gap-1 bg-[#002044] hover:bg-[#0f3563] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-all shadow-xs"
+                      title={t('navbar.registerBuildingTitle')}
+                    >
+                      <Building2 className="w-3 h-3 text-[#ff9827]" aria-hidden="true" />
+                      <span>{t('navbar.addBuilding')}</span>
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <button
-                  id="navbar-toggle-agent-mode-btn"
-                  onClick={onToggleAgentMode}
-                  className="flex items-center gap-1.5 bg-[#eaedff] hover:bg-[#dbe2ff] text-[#002044] text-xs font-bold px-3 py-2 rounded-xl border border-[#c3c6d0]/60 transition-all hover:scale-[1.01]"
-                  title="Click to simulate Certified Agent login"
-                >
-                  <UserCheck className="w-3.5 h-3.5 text-[#ff9827]" />
-                  <span>Agent Demo Sign In</span>
-                </button>
               )}
 
-              {/* Agent Profile & Verification Popover */}
-              {activeDropdown === 'agent' && (
-                <div className="absolute right-0 top-full mt-2 w-[320px] bg-white rounded-2xl shadow-2xl border border-[#002044]/15 p-4 space-y-3.5 animate-in fade-in slide-in-from-top-2 z-50">
-                  <div className="flex items-center justify-between border-b border-[#002044]/10 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <img
-                        alt="Agent Béatrice Mengue"
-                        className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500 shadow-sm"
-                        src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&q=80"
-                      />
-                      <div>
-                        <div className="text-xs font-extrabold text-[#002044]">{agentKYC.fullName}</div>
-                        <div className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                          <span>Accredited Cadastral Broker</span>
-                        </div>
+              {/* Account popover */}
+              {user && activeDropdown === 'agent' && (
+                <div className="absolute right-0 top-full mt-2 w-[300px] bg-white rounded-2xl shadow-2xl border border-[#002044]/15 p-4 space-y-3.5 animate-in fade-in slide-in-from-top-2 z-50">
+                  <div className="flex items-center gap-2.5 border-b border-[#002044]/10 pb-3">
+                    <span
+                      aria-hidden="true"
+                      className={`w-10 h-10 rounded-full text-white text-sm font-black flex items-center justify-center ${
+                        isCertifiedAgent || user.role === 'admin' ? 'bg-emerald-600' : 'bg-amber-600'
+                      }`}
+                    >
+                      {initialsOf(displayName)}
+                    </span>
+                    <div>
+                      <div className="text-xs font-extrabold text-[#002044]">{displayName}</div>
+                      <div className="text-[10px] text-[#5b6375]">@{user.username}</div>
+                      <div className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1">
+                        {isCertifiedAgent || user.role === 'admin' ? (
+                          <ShieldCheck className="w-3 h-3" aria-hidden="true" />
+                        ) : (
+                          <Clock className="w-3 h-3 text-amber-600" aria-hidden="true" />
+                        )}
+                        <span className={isCertifiedAgent || user.role === 'admin' ? '' : 'text-amber-800'}>{roleLabel}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-[#faf8ff] rounded-xl p-2.5 space-y-1.5 text-[11px] border border-[#002044]/5">
-                    <div className="flex justify-between">
-                      <span className="text-[#5b6375]">Accreditation ID:</span>
-                      <span className="font-mono font-bold text-[#002044]">{agentKYC.licenseId}</span>
+                  {isCertifiedAgent && agentKYC && (
+                    <div className="bg-[#faf8ff] rounded-xl p-2.5 space-y-1.5 text-[11px] border border-[#002044]/5">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-[#5b6375]">{t('navbar.badge')}</span>
+                        <span className="font-mono font-bold text-[#002044]">{agentKYC.badgeId}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-[#5b6375]">{t('navbar.license')}</span>
+                        <span className="font-mono font-bold text-[#002044]">{agentKYC.licenseId}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-[#5b6375]">{t('navbar.momoPayout')}</span>
+                        <span className="font-semibold text-emerald-700">{agentKYC.momoNumber}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#5b6375]">Jurisdiction:</span>
-                      <span className="font-semibold text-[#002044]">{agentKYC.city}, Littoral/Centre</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#5b6375]">MoMo Payout:</span>
-                      <span className="font-semibold text-emerald-700">{agentKYC.momoNumber}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#5b6375]">Cadastral Clearance:</span>
-                      <span className="font-bold text-[#ff9827]">Level 3 (TF Direct Sync)</span>
-                    </div>
-                  </div>
+                  )}
 
                   <div className="space-y-2">
+                    {isCertifiedAgent && (
+                      <button
+                        onClick={() => {
+                          closeDropdown();
+                          onOpenBuildingModal();
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-[#002044] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-[#0f3563] transition-colors"
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-[#ff9827]" aria-hidden="true" />
+                        <span>{t('navbar.registerNewBuilding')}</span>
+                      </button>
+                    )}
+                    {user.role === 'agent' && !isCertifiedAgent && (
+                      <button
+                        onClick={() => {
+                          closeDropdown();
+                          onOpenAgentModal();
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-[#ff9827] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-[#8e4f00] transition-colors"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                        <span>{agentKYC?.status === 'in-review' ? t('navbar.viewApplication') : t('navbar.applyCertification')}</span>
+                      </button>
+                    )}
+                    {user.role === 'admin' && (
+                      <button
+                        onClick={() => {
+                          closeDropdown();
+                          onOpenApprovals();
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-[#002044] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-[#0f3563] transition-colors"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#ff9827]" aria-hidden="true" />
+                        <span>{t('navbar.reviewApplications')}</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         closeDropdown();
-                        onOpenBuildingModal();
+                        onSignOut();
                       }}
-                      className="w-full py-2 px-3 rounded-xl bg-[#002044] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-[#0f3563] transition-colors"
+                      className="w-full py-1.5 px-3 rounded-xl bg-[#faf8ff] hover:bg-[#eaedff] text-[#5b6375] hover:text-[#002044] text-[11px] font-semibold transition-colors border border-[#002044]/10 flex items-center justify-center gap-1.5"
                     >
-                      <Building2 className="w-3.5 h-3.5 text-[#ff9827]" />
-                      <span>Register New Building Now</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        closeDropdown();
-                        onToggleAgentMode();
-                      }}
-                      className="w-full py-1.5 px-3 rounded-xl bg-[#faf8ff] hover:bg-[#eaedff] text-[#5b6375] hover:text-[#002044] text-[11px] font-semibold transition-colors border border-[#002044]/10"
-                    >
-                      Toggle to Unverified Visitor Mode
+                      <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>{t('navbar.signOut')}</span>
                     </button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 3. Primary Registration Action Button */}
-            <button
-              id="navbar-register-agent-btn"
-              onClick={onOpenAgentModal}
-              className="inline-flex items-center justify-center font-extrabold text-xs bg-[#ff9827] text-white hover:bg-[#8e4f00] px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <span>Get Certified</span>
-            </button>
+            {/* 3. Primary Registration Action Button (hidden once certified, and for administrators) */}
+            {showGetCertified && (
+              <button
+                id="navbar-register-agent-btn"
+                onClick={onOpenAgentModal}
+                className="inline-flex items-center justify-center font-extrabold text-xs bg-[#ff9827] text-white hover:bg-[#8e4f00] px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <span>{t('navbar.getCertified')}</span>
+              </button>
+            )}
           </div>
 
           {/* Mobile Right Controls: Landlord Console Quick Button + Hamburger */}
@@ -530,16 +633,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onOpenLandlordConsole}
               className="p-2 rounded-xl bg-[#002044] text-white flex items-center gap-1.5 text-xs font-bold"
-              title="Open Landlord Console"
+              title={t('navbar.openConsoleTitle')}
             >
               <Smartphone className="w-4 h-4 text-[#ff9827]" />
-              <span className="hidden sm:inline">Console</span>
+              <span className="hidden sm:inline">{t('navbar.console')}</span>
             </button>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2.5 rounded-xl bg-[#eaedff] text-[#002044] hover:bg-[#dbe2ff] transition-colors"
-              aria-label="Toggle Navigation Menu"
+              aria-label={t('navbar.toggleMenu')}
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -550,31 +653,36 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* 3. MOBILE NAVIGATION DRAWER */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-white/98 backdrop-blur-2xl border-b border-[#002044]/15 px-6 py-6 shadow-2xl space-y-5 animate-in slide-in-from-top-4 duration-200">
-          {/* Agent Status Pill for Mobile */}
+          {/* Account status for mobile */}
           <div className="bg-[#faf8ff] p-3 rounded-2xl border border-[#002044]/10 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                  agentKYC.isCertified ? 'bg-emerald-600 text-white' : 'bg-[#002044] text-[#ff9827]'
+                aria-hidden="true"
+                className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black ${
+                  !user
+                    ? 'bg-[#002044] text-[#ff9827]'
+                    : isCertifiedAgent || user.role === 'admin'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-amber-600 text-white'
                 }`}
               >
-                {agentKYC.isCertified ? <ShieldCheck className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
+                {user ? initialsOf(displayName) : <UserCheck className="w-5 h-5" />}
               </div>
               <div>
-                <div className="text-xs font-bold text-[#002044]">
-                  {agentKYC.isCertified ? agentKYC.fullName : 'Guest Visitor'}
-                </div>
-                <div className="text-[10px] text-[#5b6375]">
-                  {agentKYC.isCertified ? 'Accredited Broker (TF Verified)' : 'Uncertified Mode'}
-                </div>
+                <div className="text-xs font-bold text-[#002044]">{user ? displayName : t('navbar.visitor')}</div>
+                <div className="text-[10px] text-[#5b6375]">{user ? roleLabel : t('navbar.notSignedIn')}</div>
               </div>
             </div>
 
             <button
-              onClick={onToggleAgentMode}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (user) onSignOut();
+                else onSignIn();
+              }}
               className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[#eaedff] text-[#002044] hover:bg-[#dbe2ff] transition-colors"
             >
-              {agentKYC.isCertified ? 'Switch Mode' : 'Simulate Login'}
+              {user ? t('navbar.signOut') : t('navbar.signIn')}
             </button>
           </div>
 
@@ -587,7 +695,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="flex items-center gap-2.5">
                 <Smartphone className="w-4 h-4 text-[#ff9827]" />
-                <span>Landlord Solutions</span>
+                <span>{t('navbar.mobileLandlordSolutions')}</span>
               </div>
               <ChevronRight className="w-4 h-4 text-[#747780]" />
             </a>
@@ -599,7 +707,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Agent Certification &amp; Portal</span>
+                <span>{t('navbar.mobileAgentPortal')}</span>
               </div>
               <ChevronRight className="w-4 h-4 text-[#747780]" />
             </a>
@@ -611,23 +719,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="flex items-center gap-2.5">
                 <Layers className="w-4 h-4 text-[#002044]" />
-                <span>Ecosystem Features</span>
+                <span>{t('navbar.mobileEcosystemFeatures')}</span>
               </div>
               <ChevronRight className="w-4 h-4 text-[#747780]" />
             </a>
 
             <a
-              href="#developer-hub"
+              href="#developer-sandbox"
               onClick={() => setMobileMenuOpen(false)}
               className="py-2.5 px-3 rounded-xl hover:bg-[#eaedff] flex items-center justify-between"
             >
               <div className="flex items-center gap-2.5">
                 <Activity className="w-4 h-4 text-blue-600" />
-                <span>Developer Hub &amp; APK</span>
+                <span>{t('navbar.mobileDeveloperHub')}</span>
               </div>
-              <span className="text-[10px] bg-[#ff9827]/20 text-[#8e4f00] font-bold px-2 py-0.5 rounded-full">
-                v1.4.2
-              </span>
+              {stableApk?.version && (
+                <span className="text-[10px] bg-[#ff9827]/20 text-[#8e4f00] font-bold px-2 py-0.5 rounded-full">
+                  v{stableApk.version}
+                </span>
+              )}
             </a>
           </div>
 
@@ -641,10 +751,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#002044] to-[#0f3563] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md"
             >
               <Smartphone className="w-4 h-4 text-[#ff9827]" />
-              <span>Launch Live Landlord Operations Console</span>
+              <span>{t('navbar.mobileLaunchConsole')}</span>
             </button>
 
-            {agentKYC.isCertified && (
+            {isCertifiedAgent && (
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
@@ -652,30 +762,46 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 className="w-full py-3 px-4 rounded-xl bg-[#002044] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm"
               >
-                <Building2 className="w-4 h-4 text-[#ff9827]" />
-                <span>+ Register Building Studio</span>
+                <Building2 className="w-4 h-4 text-[#ff9827]" aria-hidden="true" />
+                <span>{t('navbar.mobileRegisterBuilding')}</span>
+              </button>
+            )}
+
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenApprovals();
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-[#002044] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                <ShieldCheck className="w-4 h-4 text-[#ff9827]" aria-hidden="true" />
+                <span>{t('navbar.reviewApplications')}</span>
+              </button>
+            )}
+
+            {showGetCertified && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenAgentModal();
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-[#ff9827] text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm hover:bg-[#8e4f00]"
+              >
+                <span>{t('navbar.mobileRegisterAgent')}</span>
               </button>
             )}
 
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
-                onOpenAgentModal();
+                downloadApk(stableApk);
               }}
-              className="w-full py-3 px-4 rounded-xl bg-[#ff9827] text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm hover:bg-[#8e4f00]"
+              disabled={!stableApk}
+              className="w-full py-2 px-4 rounded-xl bg-[#eaedff] hover:bg-[#dbe2ff] text-[#002044] font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>Register as Certified Agent</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                downloadFindNdapApk('1.4.2');
-              }}
-              className="w-full py-2 px-4 rounded-xl bg-[#eaedff] hover:bg-[#dbe2ff] text-[#002044] font-bold text-xs flex items-center justify-center gap-2"
-            >
-              <Download className="w-3.5 h-3.5 text-[#ff9827]" />
-              <span>Download Staging APK (.apk)</span>
+              <Download className="w-3.5 h-3.5 text-[#ff9827]" aria-hidden="true" />
+              <span>{stableApk ? t('navbar.mobileDownloadApk') : t('navbar.mobileApkUnavailable')}</span>
             </button>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../i18n/LanguageContext';
 
 interface BrandLogoProps {
   className?: string;
@@ -13,6 +14,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   showText = true,
   textColor = 'default',
 }) => {
+  const { t } = useI18n();
   const iconSizes = {
     sm: 'w-7 h-7',
     md: 'w-10 h-10',
@@ -69,7 +71,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
             </span>
           </div>
           <span className={`text-[10px] font-bold uppercase tracking-widest -mt-0.5 ${textColor === 'white' ? 'text-blue-200' : 'text-[#8e4f00]'}`}>
-            Proptech Africa
+            {t('brand.tagline')}
           </span>
         </div>
       )}

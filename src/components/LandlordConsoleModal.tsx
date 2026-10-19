@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-import { Building, Unit, MaintenanceTicket, FinancialRecord, BulkSmsNotice } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Building, Unit, MaintenanceTicket, FinancialRecord, BulkSmsNotice, AgentKYC, DashboardStats } from '../types';
+import { api, ApiError } from '../services/api';
+import { listSmsAudiences } from '../utils/smsAudience';
+import { formatDateTime } from '../utils/format';
+import { useModalDismiss } from '../utils/useModalDismiss';
+import { UnitPricingCard } from './UnitPricingCard';
+import { AgentApprovalsPanel } from './AgentApprovalsPanel';
+import { useI18n, type TranslationKey } from '../i18n/LanguageContext';
 import {
   X,
   Smartphone,
@@ -15,133 +22,280 @@ import {
   ArrowRight,
   TrendingUp,
   FileText,
-  Sliders
+  Sliders,
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
+
+export type ConsoleTab = 'overview' | 'ledger' | 'sms' | 'maintenance' | 'units' | 'agents';
+
+export interface NewTicketInput {
+  unitId: string;
+  category: MaintenanceTicket['category'];
+  urgency: MaintenanceTicket['urgency'];
+  description: string;
+}
+
+const TICKET_CATEGORIES: MaintenanceTicket['category'][] = ['Plumbing', 'Electrical', 'Generator', 'Security', 'Masonry'];
+const TICKET_URGENCIES: MaintenanceTicket['urgency'][] = ['Low', 'Medium', 'High', 'Emergency'];
 
 interface LandlordConsoleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultTab?: 'overview' | 'ledger' | 'sms' | 'maintenance' | 'units';
+  defaultTab?: ConsoleTab;
+  /** True when signed in as landlord/admin; otherwise the console is read-only. */
+  canEdit: boolean;
+  onSignIn: () => void;
   buildings: Building[];
   units: Unit[];
   transactions: FinancialRecord[];
   tickets: MaintenanceTicket[];
   onUpdateTicketStatus: (ticketId: string, nextStatus: MaintenanceTicket['status']) => void;
-  onAddTransaction: (record: FinancialRecord) => void;
-  onUpdateUnitStatus: (unitId: string, status: Unit['status'], rent?: number) => void;
+  /** Each resolves to an error message, or null on success. */
+  onCreateTicket: (input: NewTicketInput) => Promise<string | null>;
+  onAddTransaction: (record: Partial<FinancialRecord>) => Promise<string | null>;
+  onUpdateUnit: (unitId: string, updates: Partial<Unit>) => Promise<string | null>;
+  onAgentReviewed: (stats: DashboardStats) => void;
+  onDownloadError: (message: string) => void;
 }
 
 export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
   isOpen,
   onClose,
   defaultTab = 'overview',
+  canEdit,
+  onSignIn,
   buildings,
   units,
   transactions,
   tickets,
   onUpdateTicketStatus,
+  onCreateTicket,
   onAddTransaction,
-  onUpdateUnitStatus,
+  onUpdateUnit,
+  onAgentReviewed,
+  onDownloadError,
 }) => {
-  const [currentTab, setCurrentTab] = useState<'overview' | 'ledger' | 'sms' | 'maintenance' | 'units'>(defaultTab);
+  const { t, label, lang, locale } = useI18n();
+  const [currentTab, setCurrentTab] = useState<ConsoleTab>(defaultTab);
+  useModalDismiss(isOpen, onClose);
+
+  // New work-order form state
+  const [ticketUnitId, setTicketUnitId] = useState('');
+  const [ticketCategory, setTicketCategory] = useState<MaintenanceTicket['category']>('Plumbing');
+  const [ticketUrgency, setTicketUrgency] = useState<MaintenanceTicket['urgency']>('Medium');
+  const [ticketDescription, setTicketDescription] = useState('');
+  const [ticketStatus, setTicketStatus] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [ticketSaving, setTicketSaving] = useState(false);
 
   // SMS Broadcaster State
-  const [smsTarget, setSmsTarget] = useState('All Building Occupants (84 Tenants)');
-  const [smsMessage, setSmsMessage] = useState(
-    'Notice: Generator servicing scheduled tomorrow from 10:00 to 12:00. Borehole pressure will remain normal. Thank you - Building Management'
-  );
-  const [sentSmsNotices, setSentSmsNotices] = useState<BulkSmsNotice[]>([
-    {
-      id: 'sms-1',
-      title: 'Water Supply Routine Sanitization',
-      message: 'Notice regarding annual borehole tank cleaning on Friday.',
-      target: 'Résidence Le Cristal',
-      recipientCount: 16,
-      sentAt: 'Yesterday, 14:20 PM'
-    }
-  ]);
-  const [smsToast, setSmsToast] = useState(false);
+  const [smsTarget, setSmsTarget] = useState('all');
+  // While the message is an untouched template, it follows the interface language.
+  const [smsTemplate, setSmsTemplate] = useState<TranslationKey | null>('console.smsDefault');
+  const [smsMessage, setSmsMessage] = useState(() => t('console.smsDefault'));
+  const applySmsTemplate = (key: TranslationKey) => {
+    setSmsTemplate(key);
+    setSmsMessage(t(key));
+  };
+  useEffect(() => {
+    if (smsTemplate) setSmsMessage(t(smsTemplate));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
+  const [sentSmsNotices, setSentSmsNotices] = useState<BulkSmsNotice[]>([]);
+  const [smsStatus, setSmsStatus] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [smsSending, setSmsSending] = useState(false);
+  const [reminderStatus, setReminderStatus] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   // New Payment Deposit Simulator State
   const [selectedUnitForPay, setSelectedUnitForPay] = useState(units[0]?.id || '');
   const [paymentAmount, setPaymentAmount] = useState(250000);
   const [paymentMethod, setPaymentMethod] = useState<'MTN MoMo' | 'Orange Money'>('MTN MoMo');
-  const [depositToast, setDepositToast] = useState(false);
+  const [depositStatus, setDepositStatus] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+
+  // The modal stays mounted while closed, so re-apply the requested tab on every open.
+  useEffect(() => {
+    if (isOpen) setCurrentTab(defaultTab === 'agents' && !canEdit ? 'overview' : defaultTab);
+  }, [isOpen, defaultTab, canEdit]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    api
+      .getSmsHistory()
+      .then(setSentSmsNotices)
+      .catch((err) => console.warn('Could not load SMS history:', err));
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const totalMonthlyRev = buildings.reduce((a, b) => a + b.monthlyRevenueXAF, 0);
   const totalUnits = units.length;
   const occupiedUnits = units.filter((u) => u.status === 'Occupied').length;
-  const avgOccupancy = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 100;
+  const avgOccupancy = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+  const leasedRentRoll = units
+    .filter((u) => u.status === 'Occupied')
+    .reduce((sum, u) => sum + (u.rentAmountXAF || 0), 0);
+  const collectedXAF = transactions
+    .filter((t) => t.status === 'Completed')
+    .reduce((sum, t) => sum + (t.amountXAF || 0), 0);
+  const verifiedBuildings = buildings.filter((b) => b.isVerified).length;
+  const verifiedPct = buildings.length > 0 ? Math.round((verifiedBuildings / buildings.length) * 100) : 0;
+  const arrearsUnits = units.filter((u) => (u.balanceDueXAF || 0) > 0);
+  const buildingNameOf = (buildingId: string) => buildings.find((b) => b.id === buildingId)?.name;
+  const smsAudiences = listSmsAudiences(buildings, units);
+  const audienceLabel = (idOrLabel: string, fallback: string) => {
+    const key = idOrLabel.trim().toLowerCase();
+    if (key === 'all' || key === 'all building tenants') return t('enums.smsAudience.all');
+    if (key === 'arrears' || key === 'tenants in arrears') return t('enums.smsAudience.arrears');
+    return fallback;
+  };
+  const num = (value: number) => value.toLocaleString(locale);
 
-  const handleSendBulkSms = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!smsMessage.trim()) return;
-
-    const newNotice: BulkSmsNotice = {
-      id: `sms-${Date.now()}`,
-      title: smsMessage.slice(0, 32) + '...',
-      message: smsMessage,
-      target: smsTarget,
-      recipientCount: smsTarget.includes('All') ? 84 : 16,
-      sentAt: 'Just now'
-    };
-
-    setSentSmsNotices([newNotice, ...sentSmsNotices]);
-    setSmsToast(true);
-    setTimeout(() => setSmsToast(false), 3500);
+  const sendSms = async (notice: { title: string; message: string; target: string }) => {
+    try {
+      const res = await api.sendBulkSms(notice);
+      setSentSmsNotices((prev) => [res.notice, ...prev]);
+      return { kind: 'success' as const, text: res.message };
+    } catch (err) {
+      const text = err instanceof ApiError ? err.message : t('console.smsGatewayError');
+      return { kind: 'error' as const, text };
+    }
   };
 
-  const handleSimulateMoMoDeposit = () => {
+  const handleSendBulkSms = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const message = smsMessage.trim();
+    if (!message) {
+      setSmsStatus({ kind: 'error', text: t('console.messageEmpty') });
+      return;
+    }
+    setSmsSending(true);
+    setSmsStatus(null);
+    const title = message.length > 32 ? `${message.slice(0, 32)}…` : message;
+    setSmsStatus(await sendSms({ title, message, target: smsTarget }));
+    setSmsSending(false);
+  };
+
+  const handleSendArrearsReminder = async () => {
+    setReminderStatus(null);
+    setReminderStatus(
+      await sendSms({
+        title: t('console.arrearsTitle'),
+        message: t('console.arrearsMessage'),
+        target: 'arrears'
+      })
+    );
+  };
+
+  const handleSimulateMoMoDeposit = async () => {
     const targetUnit = units.find((u) => u.id === selectedUnitForPay) || units[0];
-    const bld = buildings.find((b) => b.id === targetUnit?.buildingId) || buildings[0];
+    if (!targetUnit) return;
+    if (!targetUnit.tenantName) {
+      setDepositStatus({ kind: 'error', text: t('console.noTenant', { unit: targetUnit.unitNumber }) });
+      return;
+    }
+    const amount = Number(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setDepositStatus({ kind: 'error', text: t('console.amountInvalid') });
+      return;
+    }
+    setDepositStatus(null);
+    const error = await onAddTransaction({ unitId: targetUnit.id, amountXAF: amount, method: paymentMethod });
+    setDepositStatus(
+      error
+        ? { kind: 'error', text: error }
+        : { kind: 'success', text: t('console.paymentRecorded', { amount: num(amount), method: paymentMethod }) }
+    );
+  };
 
-    const newTx: FinancialRecord = {
-      id: `tx-${Date.now().toString().slice(-4)}`,
-      tenantName: targetUnit?.tenantName || 'Tenant Mobile User',
-      buildingName: bld?.name || 'FindNdap Complex',
-      unitNumber: targetUnit?.unitNumber || 'Apt 101',
-      amountXAF: Number(paymentAmount) || 250000,
-      method: paymentMethod,
-      date: 'Just now',
-      status: 'Completed',
-      txRef: `${paymentMethod === 'MTN MoMo' ? 'MOMO' : 'OM'}-CMR-${Math.floor(100000 + Math.random() * 900000)}`
-    };
+  const handleCreateTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const unitId = ticketUnitId || units[0]?.id;
+    if (!unitId) return;
+    if (!ticketDescription.trim()) {
+      setTicketStatus({ kind: 'error', text: t('console.describeProblem') });
+      return;
+    }
+    setTicketSaving(true);
+    setTicketStatus(null);
+    const error = await onCreateTicket({
+      unitId,
+      category: ticketCategory,
+      urgency: ticketUrgency,
+      description: ticketDescription.trim()
+    });
+    setTicketSaving(false);
+    if (error) {
+      setTicketStatus({ kind: 'error', text: error });
+    } else {
+      setTicketDescription('');
+      setTicketStatus({ kind: 'success', text: t('console.workOrderLogged') });
+    }
+  };
 
-    onAddTransaction(newTx);
-    setDepositToast(true);
-    setTimeout(() => setDepositToast(false), 3500);
+  const handleDownloadReceipt = async (txId: string) => {
+    try {
+      await api.downloadReceipt(txId);
+    } catch (err) {
+      onDownloadError(err instanceof ApiError ? err.message : t('console.receiptFailed'));
+    }
+  };
+
+  const unitLabel = (u: Unit) => {
+    const b = buildingNameOf(u.buildingId);
+    return `${u.unitNumber}${b ? ` – ${b}` : ''}${u.tenantName ? ` (${u.tenantName})` : ''}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
-      <div className="relative w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-[#002044]/10 overflow-hidden my-4 flex flex-col max-h-[92vh]">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="landlord-console-title"
+        className="relative w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-[#002044]/10 overflow-hidden my-4 flex flex-col max-h-[92vh]"
+      >
         {/* Header Bar */}
         <div className="bg-[#002044] text-white p-5 px-6 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#ff9827] text-white flex items-center justify-center shadow-sm">
-              <Smartphone className="w-5 h-5" />
+              <Smartphone className="w-5 h-5" aria-hidden="true" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold tracking-tight">FindNdap Landlord Mobile Console</h2>
+                <h2 id="landlord-console-title" className="text-xl font-bold tracking-tight">{t('console.title')}</h2>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                  LIVE OPERATIONS
+                  {t('console.liveBadge')}
                 </span>
               </div>
               <span className="text-xs text-[#d5e3ff]">
-                Centralized property operations • Douala &amp; Yaoundé Metro
+                {t('console.subtitle')}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label={t('console.closeConsole')}
             className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
+
+        {!canEdit && (
+          <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2 text-xs font-semibold text-amber-900">
+              <Lock className="w-4 h-4" aria-hidden="true" />
+              <span>{t('console.readOnly')}</span>
+            </div>
+            <button
+              onClick={onSignIn}
+              className="px-3 py-1.5 rounded-lg bg-[#002044] text-white text-xs font-bold hover:bg-[#0f3563]"
+            >
+              {t('console.signIn')}
+            </button>
+          </div>
+        )}
 
         {/* Tab Navigation */}
         <div className="flex overflow-x-auto border-b border-[#eaedff] bg-[#faf8ff] px-6 text-xs font-bold text-[#43474f] shrink-0">
@@ -154,7 +308,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
             }`}
           >
             <Building2 className="w-4 h-4" />
-            <span>Portfolio Overview</span>
+            <span>{t('console.tabOverview')}</span>
           </button>
           <button
             onClick={() => setCurrentTab('ledger')}
@@ -165,7 +319,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
             }`}
           >
             <Wallet className="w-4 h-4 text-[#ff9827]" />
-            <span>Rent Collection &amp; Ledger ({transactions.length})</span>
+            <span>{t('console.tabLedger', { count: transactions.length })}</span>
           </button>
           <button
             onClick={() => setCurrentTab('sms')}
@@ -176,7 +330,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
             }`}
           >
             <MessageSquare className="w-4 h-4 text-[#002044]" />
-            <span>Automated Bulk SMS</span>
+            <span>{t('console.tabSms')}</span>
           </button>
           <button
             onClick={() => setCurrentTab('maintenance')}
@@ -187,7 +341,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
             }`}
           >
             <Wrench className="w-4 h-4 text-[#8e4f00]" />
-            <span>Work-Order Hub ({tickets.filter((t) => t.status !== 'Resolved').length} Pending)</span>
+            <span>{t('console.tabMaintenance', { count: tickets.filter((tk) => tk.status !== 'Resolved').length })}</span>
           </button>
           <button
             onClick={() => setCurrentTab('units')}
@@ -198,8 +352,21 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
             }`}
           >
             <Sliders className="w-4 h-4" />
-            <span>Dynamic Unit Pricing</span>
+            <span>{t('console.tabUnits')}</span>
           </button>
+          {canEdit && (
+            <button
+              onClick={() => setCurrentTab('agents')}
+              className={`py-3.5 px-4 flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+                currentTab === 'agents'
+                  ? 'border-[#ff9827] text-[#002044] bg-white'
+                  : 'border-transparent hover:text-[#002044]'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-600" aria-hidden="true" />
+              <span>{t('console.tabAgents')}</span>
+            </button>
+          )}
         </div>
 
         {/* Modal Body */}
@@ -210,34 +377,38 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
               {/* Top Stats Strip */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
-                  <span className="text-xs text-[#747780] font-semibold block">Total Monthly Portfolio Revenue</span>
+                  <span className="text-xs text-[#747780] font-semibold block">{t('console.rentRoll')}</span>
                   <div className="text-2xl font-extrabold text-[#002044] mt-1">
-                    {totalMonthlyRev.toLocaleString()} XAF
+                    {num(leasedRentRoll)} XAF
                   </div>
-                  <span className="text-[11px] text-emerald-600 font-bold">↑ Reconciled via MoMo &amp; OM</span>
+                  <span className="text-[11px] text-emerald-600 font-bold">
+                    {t('console.collectedVia', { amount: num(collectedXAF) })}
+                  </span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
-                  <span className="text-xs text-[#747780] font-semibold block">Cadastral Verified Buildings</span>
+                  <span className="text-xs text-[#747780] font-semibold block">{t('console.verifiedBuildings')}</span>
                   <div className="text-2xl font-extrabold text-[#002044] mt-1">
-                    {buildings.length} Properties
+                    {t('console.propertiesCount', { count: num(buildings.length) })}
                   </div>
-                  <span className="text-[11px] text-[#ff9827] font-bold">100% Titre Foncier Audited</span>
+                  <span className="text-[11px] text-[#ff9827] font-bold">{t('console.tfAudited', { percent: num(verifiedPct) })}</span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff]">
-                  <span className="text-xs text-[#747780] font-semibold block">Occupancy Rate</span>
+                  <span className="text-xs text-[#747780] font-semibold block">{t('console.occupancyRate')}</span>
                   <div className="text-2xl font-extrabold text-[#002044] mt-1">
-                    {avgOccupancy}%
+                    {t('console.percent', { value: num(avgOccupancy) })}
                   </div>
-                  <span className="text-[11px] text-[#002044] font-bold">{occupiedUnits} of {totalUnits} Units Leased</span>
+                  <span className="text-[11px] text-[#002044] font-bold">
+                    {t('console.unitsLeased', { occupied: num(occupiedUnits), total: num(totalUnits) })}
+                  </span>
                 </div>
               </div>
 
               {/* Digitized Buildings Grid */}
               <div>
                 <h3 className="text-base font-bold text-[#002044] mb-3">
-                  Digitized Real Estate Assets
+                  {t('console.assetsTitle')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {buildings.map((bld) => (
@@ -245,35 +416,44 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                       key={bld.id}
                       className="p-4 bg-white border border-[#eaedff] rounded-2xl flex gap-4 shadow-xs hover:border-[#ff9827]/40 transition-colors"
                     >
-                      <img
-                        src={bld.photoUrl}
-                        alt={bld.name}
-                        className="w-24 h-24 rounded-xl object-cover shrink-0"
-                      />
+                      {bld.photoUrl ? (
+                        <img
+                          src={bld.photoUrl}
+                          alt={bld.name}
+                          className="w-24 h-24 rounded-xl object-cover shrink-0"
+                        />
+                      ) : (
+                        <div
+                          aria-hidden="true"
+                          className="w-24 h-24 rounded-xl bg-[#eaedff] text-[#002044] flex items-center justify-center shrink-0"
+                        >
+                          <Building2 className="w-8 h-8 opacity-60" />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <h4 className="font-bold text-sm text-[#002044] truncate">{bld.name}</h4>
                           <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
-                            Verified TF
+                            {t('console.verifiedTf')}
                           </span>
                         </div>
                         <div className="text-xs text-[#747780] mt-0.5">
-                          {bld.neighborhood}, {bld.city}
+                          {[bld.neighborhood, bld.city].filter(Boolean).join(', ') || '—'}
                         </div>
                         <div className="text-xs font-mono text-[#0f3563] mt-1">{bld.cadastreNumber}</div>
 
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {bld.amenities.slice(0, 2).map((a) => (
+                          {(bld.amenities ?? []).slice(0, 2).map((a) => (
                             <span
                               key={a}
                               className="text-[10px] px-1.5 py-0.5 rounded bg-[#f2f3ff] text-[#002044]"
                             >
-                              {a}
+                              {label('amenities', a)}
                             </span>
                           ))}
-                          {bld.amenities.length > 2 && (
+                          {(bld.amenities?.length ?? 0) > 2 && (
                             <span className="text-[10px] text-[#747780]">
-                              +{bld.amenities.length - 2} more
+                              {t('console.more', { count: bld.amenities.length - 2 })}
                             </span>
                           )}
                         </div>
@@ -288,38 +468,64 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
           {/* TAB: LEDGER & MOMO COLLECTION */}
           {currentTab === 'ledger' && (
             <div className="space-y-6">
-              {/* Arrears Warning Box */}
-              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider">
-                      Arrears Alert: 1 Account Overdue
-                    </h4>
-                    <p className="text-xs text-rose-800 mt-0.5">
-                      Alain Kouam (Apt 103, Le Cristal) owes <strong>220,000 XAF</strong>. Automated payment reminder is scheduled.
-                    </p>
+              {/* Arrears Warning Box (derived from live unit balances) */}
+              {arrearsUnits.length > 0 ? (
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider">
+                          {t(arrearsUnits.length > 1 ? 'console.arrearsAlertMany' : 'console.arrearsAlertOne', {
+                            count: arrearsUnits.length
+                          })}
+                        </h4>
+                        <ul className="text-xs text-rose-800 mt-0.5 space-y-0.5">
+                          {arrearsUnits.map((u) => (
+                            <li key={u.id}>
+                              {u.tenantName || t('console.unassignedTenant')} ({u.unitNumber}
+                              {buildingNameOf(u.buildingId) ? `, ${buildingNameOf(u.buildingId)}` : ''}) {t('console.owes')}{' '}
+                              <strong>{num(u.balanceDueXAF || 0)} XAF</strong>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleSendArrearsReminder}
+                      disabled={!canEdit}
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {t('console.dispatchReminder')}
+                    </button>
                   </div>
+                  {reminderStatus && (
+                    <p
+                      role="status"
+                      className={`text-xs font-semibold ${reminderStatus.kind === 'success' ? 'text-emerald-800' : 'text-rose-800'}`}
+                    >
+                      {reminderStatus.text}
+                    </p>
+                  )}
                 </div>
-                <button
-                  onClick={() => {
-                    alert('Instant MTN MoMo Payment Reminder SMS dispatched to Alain Kouam (+237 650 11 22 33)');
-                  }}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-xs transition-colors"
-                >
-                  Dispatch MoMo Reminder SMS
-                </button>
-              </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-semibold text-emerald-900">
+                    {t('console.noArrears')}
+                  </span>
+                </div>
+              )}
 
               {/* Transactions Ledger Table */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-base font-bold text-[#002044]">
-                    Automated Mobile Money Transactions Ledger
+                    {t('console.ledgerTitle')}
                   </h3>
                   <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Auto-reconciled
+                    {t('console.autoReconciled')}
                   </span>
                 </div>
 
@@ -327,12 +533,12 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#f2f3ff] text-[#43474f] font-bold border-b border-[#eaedff]">
                       <tr>
-                        <th className="p-3.5">Tenant / Unit</th>
-                        <th className="p-3.5">Gateway</th>
-                        <th className="p-3.5">Amount</th>
-                        <th className="p-3.5">Timestamp</th>
-                        <th className="p-3.5">Status</th>
-                        <th className="p-3.5">Receipt</th>
+                        <th className="p-3.5">{t('console.colTenant')}</th>
+                        <th className="p-3.5">{t('console.colGateway')}</th>
+                        <th className="p-3.5">{t('console.colAmount')}</th>
+                        <th className="p-3.5">{t('console.colTimestamp')}</th>
+                        <th className="p-3.5">{t('console.colStatus')}</th>
+                        <th className="p-3.5">{t('console.colReceipt')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#eaedff]">
@@ -356,9 +562,9 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                             </span>
                           </td>
                           <td className="p-3.5 font-extrabold text-[#002044]">
-                            {tx.amountXAF.toLocaleString()} XAF
+                            {num(tx.amountXAF)} XAF
                           </td>
-                          <td className="p-3.5 text-[#747780]">{tx.date}</td>
+                          <td className="p-3.5 text-[#747780]">{formatDateTime(tx.date, locale)}</td>
                           <td className="p-3.5">
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
@@ -369,17 +575,24 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                                   : 'bg-rose-100 text-rose-800'
                               }`}
                             >
-                              {tx.status}
+                              {label('enums.txStatus', tx.status)}
                             </span>
                           </td>
                           <td className="p-3.5">
-                            <button
-                              onClick={() => alert(`Official PDF receipt generated for Ref: ${tx.txRef}`)}
-                              className="text-[#0f3563] hover:underline font-semibold flex items-center gap-1"
-                            >
-                              <FileText className="w-3.5 h-3.5 text-[#ff9827]" />
-                              <span>PDF</span>
-                            </button>
+                            {tx.status === 'Completed' ? (
+                              <button
+                                onClick={() => handleDownloadReceipt(tx.id)}
+                                aria-label={t('console.downloadReceipt', { ref: tx.txRef })}
+                                className="text-[#0f3563] hover:underline font-semibold flex items-center gap-1"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-[#ff9827]" aria-hidden="true" />
+                                <span>{t('console.pdf')}</span>
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-[#747780]" title={t('console.receiptPending')}>
+                                —
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -388,43 +601,47 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                 </div>
               </div>
 
-              {/* Deposit Simulator Sandbox inside Ledger */}
+              {/* Record a rent payment against a unit (reconciles its balance) */}
               <div className="p-4 bg-[#f2f3ff] rounded-2xl border border-[#eaedff] space-y-3">
                 <div className="text-xs font-bold text-[#002044] uppercase tracking-wider">
-                  Test Live Payment Gateway Simulation
+                  {t('console.recordTitle')}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-[#43474f] mb-1">Select Unit</label>
+                    <label htmlFor="pay-unit" className="block text-[11px] font-semibold text-[#43474f] mb-1">{t('console.unit')}</label>
                     <select
+                      id="pay-unit"
                       value={selectedUnitForPay}
                       onChange={(e) => setSelectedUnitForPay(e.target.value)}
                       className="w-full h-10 px-2.5 rounded-lg bg-white text-xs border border-[#c3c6d0]"
                     >
                       {units.map((u) => (
                         <option key={u.id} value={u.id}>
-                          {u.unitNumber} - {u.type}
+                          {unitLabel(u)}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold text-[#43474f] mb-1">Gateway</label>
+                    <label htmlFor="pay-method" className="block text-[11px] font-semibold text-[#43474f] mb-1">{t('console.gateway')}</label>
                     <select
+                      id="pay-method"
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value as 'MTN MoMo' | 'Orange Money')}
                       className="w-full h-10 px-2.5 rounded-lg bg-white text-xs border border-[#c3c6d0]"
                     >
-                      <option value="MTN MoMo">MTN Mobile Money</option>
+                      <option value="MTN MoMo">{t('console.mtnMobileMoney')}</option>
                       <option value="Orange Money">Orange Money</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold text-[#43474f] mb-1">Amount (XAF)</label>
+                    <label htmlFor="pay-amount" className="block text-[11px] font-semibold text-[#43474f] mb-1">{t('console.amountXaf')}</label>
                     <input
+                      id="pay-amount"
                       type="number"
+                      min={1}
                       step="10000"
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(Number(e.target.value))}
@@ -435,15 +652,21 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
 
                 <button
                   onClick={handleSimulateMoMoDeposit}
-                  className="px-5 py-2.5 bg-[#002044] hover:bg-[#0f3563] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-xs"
+                  disabled={!canEdit || units.length === 0}
+                  className="px-5 py-2.5 bg-[#002044] hover:bg-[#0f3563] text-white text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Wallet className="w-3.5 h-3.5 text-[#ff9827]" />
-                  <span>Execute Simulated {paymentMethod} Deposit</span>
+                  <Wallet className="w-3.5 h-3.5 text-[#ff9827]" aria-hidden="true" />
+                  <span>{t('console.recordPayment', { method: paymentMethod })}</span>
                 </button>
 
-                {depositToast && (
-                  <div className="p-2.5 bg-emerald-100 text-emerald-900 rounded-lg text-xs font-medium">
-                    ✓ Payment of {paymentAmount.toLocaleString()} XAF reconciled to ledger via {paymentMethod}!
+                {depositStatus && (
+                  <div
+                    role="status"
+                    className={`p-2.5 rounded-lg text-xs font-medium ${
+                      depositStatus.kind === 'success' ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'
+                    }`}
+                  >
+                    {depositStatus.text}
                   </div>
                 )}
               </div>
@@ -457,92 +680,98 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
               <div className="bg-[#f2f3ff] p-5 rounded-2xl border border-[#eaedff] space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-[#002044] uppercase tracking-wider">
-                    Direct Telecom Bulk SMS Broadcast
+                    {t('console.smsTitle')}
                   </h3>
                   <span className="text-xs text-[#747780]">
-                    Direct Gateway: MTN CMR &amp; Orange CMR
+                    {t('console.smsGateway')}
                   </span>
                 </div>
 
                 <form onSubmit={handleSendBulkSms} className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-[#002044] mb-1">
-                      Recipient Audience
+                      {t('console.audience')}
                     </label>
                     <select
                       value={smsTarget}
                       onChange={(e) => setSmsTarget(e.target.value)}
                       className="w-full h-10 px-3 rounded-lg bg-white text-xs border border-[#c3c6d0]"
                     >
-                      <option value="All Building Occupants (84 Tenants)">
-                        All Building Occupants (84 Tenants)
-                      </option>
-                      <option value="Résidence Le Cristal Only (16 Tenants)">
-                        Résidence Le Cristal Only (16 Tenants)
-                      </option>
-                      <option value="Les Terrasses d’Akwa (32 Tenants)">
-                        Les Terrasses d’Akwa (32 Tenants)
-                      </option>
-                      <option value="Tenants in Arrears (Immediate Follow-Up)">
-                        Tenants in Arrears (Immediate Follow-Up)
-                      </option>
+                      {smsAudiences.map((a) => (
+                        <option key={a.id} value={a.id} disabled={a.recipients.length === 0}>
+                          {t(a.recipients.length === 1 ? 'console.tenantsOne' : 'console.tenantsMany', {
+                            label: audienceLabel(a.id, a.label),
+                            count: a.recipients.length
+                          })}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-xs font-bold text-[#002044]">
-                        Announcement Message (Bilingual SMS format)
+                        {t('console.messageLabel')}
                       </label>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() =>
-                            setSmsMessage(
-                              'Reminder: Monthly rent is due in 5 days on 10th Sep. Please pay directly via your FindNdap mobile app with MTN MoMo or Orange Money.'
-                            )
-                          }
+                          onClick={() => applySmsTemplate('console.templateDueText')}
                           className="text-[10px] text-[#0f3563] bg-white px-2 py-0.5 rounded border border-[#c3c6d0]"
                         >
-                          Template: Due Reminder
+                          {t('console.templateDue')}
                         </button>
                         <button
                           type="button"
-                          onClick={() =>
-                            setSmsMessage(
-                              'Alert: Standby generator maintenance tomorrow 10:00-12:00. No water interruption anticipated. - Management'
-                            )
-                          }
+                          onClick={() => applySmsTemplate('console.templateGeneratorText')}
                           className="text-[10px] text-[#0f3563] bg-white px-2 py-0.5 rounded border border-[#c3c6d0]"
                         >
-                          Template: Generator Service
+                          {t('console.templateGenerator')}
                         </button>
                       </div>
                     </div>
                     <textarea
                       rows={3}
+                      aria-label={t('console.messageAria')}
                       value={smsMessage}
-                      onChange={(e) => setSmsMessage(e.target.value)}
+                      onChange={(e) => {
+                        setSmsTemplate(null);
+                        setSmsMessage(e.target.value);
+                      }}
                       className="w-full p-3 rounded-xl bg-white text-xs text-[#131b2e] border border-[#c3c6d0] focus:ring-2 focus:ring-[#002044]"
                     />
                     <div className="flex justify-between text-[11px] text-[#747780] mt-1">
-                      <span>Standard GSM characters: {smsMessage.length} / 160</span>
-                      <span>Delivery rate: 99.8%</span>
+                      <span>{t('console.gsmChars', { count: smsMessage.length })}</span>
+                      <span>
+                        {t(Math.ceil(smsMessage.length / 160) > 1 ? 'console.segmentsMany' : 'console.segmentsOne', {
+                          count: Math.max(1, Math.ceil(smsMessage.length / 160))
+                        })}
+                      </span>
                     </div>
                   </div>
 
                   <button
                     type="submit"
+                    disabled={smsSending || !canEdit}
                     className="px-6 py-2.5 bg-[#ff9827] hover:bg-[#8e4f00] text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-2 transition-all hover:scale-105"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Broadcast SMS Announcement</span>
+                    <span>{smsSending ? t('console.sending') : t('console.broadcast')}</span>
                   </button>
 
-                  {smsToast && (
-                    <div className="p-3 bg-emerald-100 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>SMS Announcement successfully transmitted across mobile networks!</span>
+                  {smsStatus && (
+                    <div
+                      role="status"
+                      className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+                        smsStatus.kind === 'success' ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'
+                      }`}
+                    >
+                      {smsStatus.kind === 'success' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-rose-600" />
+                      )}
+                      <span>{smsStatus.text}</span>
                     </div>
                   )}
                 </form>
@@ -551,9 +780,12 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
               {/* History of Sent Notices */}
               <div>
                 <h4 className="text-xs font-bold text-[#002044] uppercase tracking-wider mb-2">
-                  Sent Announcements Log
+                  {t('console.sentLog')}
                 </h4>
                 <div className="space-y-2">
+                  {sentSmsNotices.length === 0 && (
+                    <p className="text-[11px] text-[#747780]">{t('console.noneSent')}</p>
+                  )}
                   {sentSmsNotices.map((notice) => (
                     <div
                       key={notice.id}
@@ -563,11 +795,14 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                         <div className="font-bold text-xs text-[#002044]">{notice.title}</div>
                         <p className="text-[11px] text-[#43474f] mt-0.5">{notice.message}</p>
                         <div className="text-[10px] text-[#747780] mt-1">
-                          Audience: {notice.target} • {notice.recipientCount} Recipients
+                          {t('console.audienceLine', {
+                            target: audienceLabel(notice.target, notice.target),
+                            count: num(notice.recipientCount)
+                          })}
                         </div>
                       </div>
                       <span className="text-[10px] text-[#747780] whitespace-nowrap ml-4">
-                        {notice.sentAt}
+                        {formatDateTime(notice.sentAt, locale)}
                       </span>
                     </div>
                   ))}
@@ -582,16 +817,101 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-bold text-[#002044]">
-                    Centralized Work-Order &amp; Repair Triage
+                    {t('console.maintenanceTitle')}
                   </h3>
                   <p className="text-xs text-[#747780]">
-                    Track tenant tickets from submission to resolution with certified vendor quotes.
+                    {t('console.maintenanceIntro')}
                   </p>
                 </div>
                 <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">
-                  Avg SLA: 4.2 Hours
+                  {t('console.open', { count: tickets.filter((tk) => tk.status !== 'Resolved').length })}
                 </span>
               </div>
+
+              {/* New work-order */}
+              <form onSubmit={handleCreateTicket} className="p-4 bg-[#f2f3ff] rounded-2xl border border-[#eaedff] space-y-3">
+                <div className="text-xs font-bold text-[#002044] uppercase tracking-wider flex items-center gap-2">
+                  <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>{t('console.logTitle')}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label htmlFor="ticket-unit" className="block text-[11px] font-semibold text-[#43474f] mb-1">{t('console.unit')}</label>
+                    <select
+                      id="ticket-unit"
+                      value={ticketUnitId || units[0]?.id || ''}
+                      onChange={(e) => setTicketUnitId(e.target.value)}
+                      className="w-full h-10 px-2.5 rounded-lg bg-white text-xs border border-[#c3c6d0]"
+                    >
+                      {units.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {unitLabel(u)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="ticket-category" className="block text-[11px] font-semibold text-[#43474f] mb-1">{t('console.category')}</label>
+                    <select
+                      id="ticket-category"
+                      value={ticketCategory}
+                      onChange={(e) => setTicketCategory(e.target.value as MaintenanceTicket['category'])}
+                      className="w-full h-10 px-2.5 rounded-lg bg-white text-xs border border-[#c3c6d0]"
+                    >
+                      {TICKET_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {t(`enums.ticketCategory.${c}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="ticket-urgency" className="block text-[11px] font-semibold text-[#43474f] mb-1">{t('console.urgency')}</label>
+                    <select
+                      id="ticket-urgency"
+                      value={ticketUrgency}
+                      onChange={(e) => setTicketUrgency(e.target.value as MaintenanceTicket['urgency'])}
+                      className="w-full h-10 px-2.5 rounded-lg bg-white text-xs border border-[#c3c6d0]"
+                    >
+                      {TICKET_URGENCIES.map((u) => (
+                        <option key={u} value={u}>
+                          {t(`enums.urgency.${u}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="ticket-description" className="block text-[11px] font-semibold text-[#43474f] mb-1">
+                    {t('console.problem')}
+                  </label>
+                  <textarea
+                    id="ticket-description"
+                    rows={2}
+                    maxLength={500}
+                    value={ticketDescription}
+                    onChange={(e) => setTicketDescription(e.target.value)}
+                    className="w-full p-2.5 rounded-lg bg-white text-xs text-[#131b2e] border border-[#c3c6d0]"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={!canEdit || ticketSaving || units.length === 0}
+                    className="px-5 py-2 bg-[#002044] hover:bg-[#0f3563] text-white text-xs font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {ticketSaving ? t('console.saving') : t('console.logWorkOrder')}
+                  </button>
+                  {ticketStatus && (
+                    <span
+                      role="status"
+                      className={`text-xs font-semibold ${ticketStatus.kind === 'success' ? 'text-emerald-800' : 'text-rose-700'}`}
+                    >
+                      {ticketStatus.text}
+                    </span>
+                  )}
+                </div>
+              </form>
 
               {/* 4-Stage Kanban Pipeline */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -604,7 +924,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                     >
                       <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#eaedff]">
                         <span className="text-xs font-bold text-[#002044] uppercase tracking-wider">
-                          {stage}
+                          {t(`enums.ticketStatus.${stage}`)}
                         </span>
                         <span className="w-5 h-5 rounded-full bg-white text-[#002044] text-xs font-bold flex items-center justify-center shadow-xs">
                           {stageTickets.length}
@@ -625,9 +945,9 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                                     : 'bg-amber-100 text-amber-800'
                                 }`}
                               >
-                                {tkt.urgency}
+                                {label('enums.urgency', tkt.urgency)}
                               </span>
-                              <span className="text-[10px] text-[#747780]">{tkt.category}</span>
+                              <span className="text-[10px] text-[#747780]">{label('enums.ticketCategory', tkt.category)}</span>
                             </div>
 
                             <div className="text-xs font-bold text-[#002044] leading-snug">
@@ -637,10 +957,11 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                             <div className="text-[11px] text-[#747780]">
                               {tkt.buildingName} • {tkt.unitNumber}
                             </div>
+                            <div className="text-[10px] text-[#747780]">{formatDateTime(tkt.reportedDate, locale)}</div>
 
                             {tkt.assignedVendor && (
                               <div className="text-[10px] text-[#0f3563] font-semibold bg-[#eaedff] p-1 rounded">
-                                Vendor: {tkt.assignedVendor}
+                                {t('console.vendor', { vendor: tkt.assignedVendor })}
                               </div>
                             )}
 
@@ -656,9 +977,18 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
                                   };
                                   onUpdateTicketStatus(tkt.id, nextStages[stage]);
                                 }}
-                                className="w-full py-1.5 bg-[#002044] hover:bg-[#0f3563] text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition-colors"
+                                disabled={!canEdit}
+                                className="w-full py-1.5 bg-[#002044] hover:bg-[#0f3563] text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <span>Advance to {stage === 'Logged' ? 'In-Review' : stage === 'In-Review' ? 'Dispatched' : 'Resolved'}</span>
+                                <span>
+                                  {t('console.advanceTo', {
+                                    stage: t(
+                                      `enums.ticketStatus.${
+                                        stage === 'Logged' ? 'In-Review' : stage === 'In-Review' ? 'Dispatched' : 'Resolved'
+                                      }`
+                                    )
+                                  })}
+                                </span>
                                 <ArrowRight className="w-3 h-3" />
                               </button>
                             )}
@@ -667,7 +997,7 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
 
                         {stageTickets.length === 0 && (
                           <div className="text-center py-6 text-xs text-[#747780] italic">
-                            No tickets in this stage
+                            {t('console.noTickets')}
                           </div>
                         )}
                       </div>
@@ -684,68 +1014,31 @@ export const LandlordConsoleModal: React.FC<LandlordConsoleModalProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-bold text-[#002044]">
-                    Real-Time Unit Availability &amp; Pricing Management
+                    {t('console.unitsTitle')}
                   </h3>
                   <p className="text-xs text-[#747780]">
-                    Toggle status instantly across your mobile app and online listings.
+                    {t('console.unitsIntro')}
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {units.map((unit) => (
-                  <div
+                  <UnitPricingCard
                     key={unit.id}
-                    className="p-4 bg-white border border-[#eaedff] rounded-2xl shadow-xs space-y-3"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="text-sm font-bold text-[#002044]">{unit.unitNumber}</div>
-                        <div className="text-xs text-[#747780]">{unit.type}</div>
-                      </div>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                          unit.status === 'Available'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : unit.status === 'Occupied'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {unit.status}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-[#eaedff]">
-                      <span className="text-xs text-[#747780]">Monthly Rent:</span>
-                      <span className="text-sm font-extrabold text-[#ff9827]">
-                        {unit.rentAmountXAF.toLocaleString()} XAF
-                      </span>
-                    </div>
-
-                    {unit.tenantName && (
-                      <div className="text-[11px] text-[#43474f] bg-[#f2f3ff] p-2 rounded-lg">
-                        Tenant: <strong>{unit.tenantName}</strong> ({unit.tenantPhone})
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={() =>
-                          onUpdateUnitStatus(
-                            unit.id,
-                            unit.status === 'Available' ? 'Occupied' : 'Available'
-                          )
-                        }
-                        className="flex-1 py-1.5 bg-[#f2f3ff] hover:bg-[#eaedff] text-[#002044] text-xs font-bold rounded-lg transition-colors"
-                      >
-                        Toggle {unit.status === 'Available' ? 'Occupied' : 'Available'}
-                      </button>
-                    </div>
-                  </div>
+                    unit={unit}
+                    buildingName={buildingNameOf(unit.buildingId)}
+                    canEdit={canEdit}
+                    onUpdateUnit={onUpdateUnit}
+                  />
                 ))}
               </div>
             </div>
+          )}
+
+          {/* TAB: AGENT APPROVALS (admin only) */}
+          {currentTab === 'agents' && canEdit && (
+            <AgentApprovalsPanel onReviewed={onAgentReviewed} onError={onDownloadError} />
           )}
         </div>
       </div>

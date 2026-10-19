@@ -1,55 +1,50 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { LandlordWorkflowSection } from './components/LandlordWorkflowSection';
-import { AgentCertificationSection } from './components/AgentCertificationSection';
+import { AgentCertificationSection, AgentApplication } from './components/AgentCertificationSection';
 import { DeveloperSandboxSection } from './components/DeveloperSandboxSection';
 import { TestimonialsSection } from './components/TestimonialsSection';
 import { CallToActionSection } from './components/CallToActionSection';
 import { Footer } from './components/Footer';
 import { BuildingRegistrationModal } from './components/BuildingRegistrationModal';
-import { LandlordConsoleModal } from './components/LandlordConsoleModal';
+import { LandlordConsoleModal, ConsoleTab, NewTicketInput } from './components/LandlordConsoleModal';
+import { LoginModal } from './components/LoginModal';
 import { CursorGlowFollower } from './components/CursorGlowFollower';
 import { FuturisticHudDock } from './components/FuturisticHudDock';
 
-import {
-  INITIAL_BUILDINGS,
-  INITIAL_UNITS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_TICKETS,
-  DEFAULT_CERTIFIED_AGENT
-} from './data/mockData';
+import { Building, Unit, FinancialRecord, MaintenanceTicket, AgentKYC, AuthUser, DashboardStats } from './types';
+import { api, ApiError, authStore } from './services/api';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useI18n } from './i18n/LanguageContext';
 
-import { Building, Unit, FinancialRecord, MaintenanceTicket, AgentKYC, DashboardStats } from './types';
-import { api } from './services/api';
-import { CheckCircle2, ShieldCheck, Building2 } from 'lucide-react';
+type Toast = { kind: 'success' | 'error'; text: string };
 
 export default function App() {
-  // Agent Certification State
-  const [agentKYC, setAgentKYC] = useState<AgentKYC>(DEFAULT_CERTIFIED_AGENT);
+  const { t, locale } = useI18n();
+  // Stable access to the current translator from memoised callbacks (avoids refetching data on language change).
+  const tRef = useRef(t);
+  tRef.current = t;
+  const errorText = (err: unknown) => (err instanceof ApiError ? err.message : t('app.errorUnreachable'));
 
-  // Buildings State
-  const [buildings, setBuildings] = useState<Building[]>(INITIAL_BUILDINGS);
+  // Signed-in account (null = visitor) and, for agents, their certification record
+  const [user, setUser] = useState<AuthUser | null>(authStore.get()?.user ?? null);
+  const [agentKYC, setAgentKYC] = useState<AgentKYC | null>(null);
 
-  // Units State
-  const [units, setUnits] = useState<Unit[]>(INITIAL_UNITS);
-
-  // Financial Transactions State
-  const [transactions, setTransactions] = useState<FinancialRecord[]>(INITIAL_TRANSACTIONS);
-
-  // Maintenance Tickets State
-  const [tickets, setTickets] = useState<MaintenanceTicket[]>(INITIAL_TICKETS);
-
-  // Real-Time Dynamic Dashboard Stats (Live from /api/stats)
+  // Portfolio data, always loaded from the server
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [transactions, setTransactions] = useState<FinancialRecord[]>([]);
+  const [tickets, setTickets] = useState<MaintenanceTicket[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   // Modals State
   const [isBuildingModalOpen, setIsBuildingModalOpen] = useState(false);
   const [isLandlordConsoleOpen, setIsLandlordConsoleOpen] = useState(false);
-  const [consoleDefaultTab, setConsoleDefaultTab] = useState<'overview' | 'ledger' | 'sms' | 'maintenance' | 'units'>('overview');
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [consoleDefaultTab, setConsoleDefaultTab] = useState<ConsoleTab>('overview');
 
-  // Notification Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
 
   // Futuristic Theme Mode ('dark' by default to showcase the high-tech video aesthetic)
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
@@ -59,170 +54,165 @@ export default function App() {
     setThemeMode((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4500);
-  };
+  const showToast = useCallback((text: string, kind: Toast['kind'] = 'success') => {
+    setToast({ kind, text });
+    setTimeout(() => setToast((current) => (current?.text === text ? null : current)), 4500);
+  }, []);
 
   // Load live data from API endpoints
   const refreshAllData = useCallback(async () => {
-    try {
-      const [statsData, bldData, unitData, txData, tktData, kycData] = await Promise.all([
-        api.getStats().catch(() => null),
-        api.getBuildings().catch(() => null),
-        api.getUnits().catch(() => null),
-        api.getTransactions().catch(() => null),
-        api.getTickets().catch(() => null),
-        api.getAgentKYC().catch(() => null)
-      ]);
+    const [statsData, bldData, unitData, txData, tktData] = await Promise.all([
+      api.getStats().catch(() => null),
+      api.getBuildings().catch(() => null),
+      api.getUnits().catch(() => null),
+      api.getTransactions().catch(() => null),
+      api.getTickets().catch(() => null)
+    ]);
 
-      if (statsData) setStats(statsData);
-      if (bldData && bldData.length > 0) setBuildings(bldData);
-      if (unitData && unitData.length > 0) setUnits(unitData);
-      if (txData && txData.length > 0) setTransactions(txData);
-      if (tktData && tktData.length > 0) setTickets(tktData);
-      if (kycData) setAgentKYC(kycData);
-    } catch (err) {
-      console.warn('API sync warning (using client cached state):', err);
-    }
-  }, []);
+    if (statsData) setStats(statsData);
+    if (bldData) setBuildings(bldData);
+    if (unitData) setUnits(unitData);
+    if (txData) setTransactions(txData);
+    if (tktData) setTickets(tktData);
+    if (!statsData && !bldData) showToast(tRef.current('app.loadFailed'), 'error');
+  }, [showToast]);
 
   useEffect(() => {
     refreshAllData();
   }, [refreshAllData]);
 
-  // Toggle certified agent demo state via API
-  const handleToggleAgentMode = async () => {
-    try {
-      const res = await api.toggleAgentDemoMode();
-      setAgentKYC(res.agentKYC);
-      if (res.stats) setStats(res.stats);
-      if (res.agentKYC.isCertified) {
-        showToast('Switched to Certified Agent Mode (Béatrice Mengue - Cert #FND-CERT-2025-0849). Building registration unlocked!');
-      } else {
-        showToast('Switched to Uncertified Agent Mode. Building registration is now locked.');
-      }
-    } catch {
-      // Fallback
-      if (agentKYC.isCertified) {
-        setAgentKYC({
-          fullName: 'Unverified Guest',
-          agencyName: 'Unregistered Broker',
-          licenseId: 'NONE',
-          city: 'Douala',
-          momoNumber: '',
-          isCertified: false,
-          status: 'unverified'
+  // Restore the session on load, and follow sign-outs (including expired tokens rejected by the server).
+  useEffect(() => {
+    if (authStore.get()) {
+      api
+        .me()
+        .then(({ user: u, agentKYC: k }) => {
+          setUser(u);
+          setAgentKYC(k);
+        })
+        .catch(() => {
+          setUser(null);
+          setAgentKYC(null);
         });
-        showToast('Switched to Uncertified Agent Mode. Building registration is now locked.');
-      } else {
-        setAgentKYC(DEFAULT_CERTIFIED_AGENT);
-        showToast('Switched to Certified Agent Mode. Building registration unlocked!');
-      }
     }
+    return authStore.subscribe(() => {
+      const current = authStore.get();
+      setUser(current?.user ?? null);
+      if (!current) setAgentKYC(null);
+    });
+  }, []);
+
+  const openLogin = () => setIsLoginOpen(true);
+
+  const handleSignedIn = (u: AuthUser, kyc: AgentKYC | null) => {
+    setUser(u);
+    setAgentKYC(kyc);
+    showToast(t('app.signedInAs', { username: u.username }));
   };
 
-  // Certified Agent Registration handler via API
-  const handleRegisterAgent = async (data: Partial<AgentKYC>) => {
+  const handleSignOut = async () => {
+    await api.logout().catch(() => {});
+    setIsLandlordConsoleOpen(false);
+    setIsBuildingModalOpen(false);
+    showToast(t('app.signedOut'));
+  };
+
+  // Agent submits (or resubmits) a certification application. Resolves to an error message, or null.
+  const handleSubmitApplication = async (application: AgentApplication): Promise<string | null> => {
     try {
-      const res = await api.submitAgentKYC(data);
+      const res = await api.submitAgentKYC(application);
       setAgentKYC(res.agentKYC);
-      if (res.stats) setStats(res.stats);
-      showToast(`Congratulations ${res.agentKYC.fullName}! You are now an Accredited Certified Agent.`);
-    } catch {
-      const updated: AgentKYC = { ...agentKYC, ...data };
-      setAgentKYC(updated);
-      if (updated.isCertified) {
-        showToast(`Congratulations ${updated.fullName}! You are now an Accredited Certified Agent.`);
-      }
+      showToast(res.message);
+      return null;
+    } catch (err) {
+      return errorText(err);
     }
   };
 
-  // Add newly registered building + units via API
-  const handleAddBuilding = async (newBuilding: Building, newUnits: Unit[]) => {
+  // Add newly registered building + units via API. Resolves to an error message, or null on success.
+  const handleAddBuilding = async (newBuilding: Building, newUnits: Unit[]): Promise<string | null> => {
     try {
       const res = await api.createBuilding(newBuilding, newUnits);
-      if (res.success) {
-        setBuildings((prev) => [res.building, ...prev]);
-        setUnits((prev) => [...newUnits, ...prev]);
-        if (res.stats) setStats(res.stats);
-        showToast(`"${res.building.name}" (${newUnits.length} units) published to FindNdap Cadastral Registry!`);
-        return;
-      }
+      setBuildings((prev) => [res.building, ...prev]);
+      setUnits((prev) => [...prev, ...res.units]);
+      if (res.stats) setStats(res.stats);
+      showToast(t('app.buildingPublished', { name: res.building.name, count: res.units.length }));
+      return null;
     } catch (err) {
-      console.error('Failed to create building via API:', err);
+      return errorText(err);
     }
-    setBuildings([newBuilding, ...buildings]);
-    setUnits([...newUnits, ...units]);
-    showToast(`"${newBuilding.name}" (${newUnits.length} units) published to FindNdap Cadastral Registry!`);
   };
 
   // Ticket Status progression via API
   const handleUpdateTicketStatus = async (ticketId: string, nextStatus: MaintenanceTicket['status']) => {
     try {
       const res = await api.updateTicket(ticketId, { status: nextStatus });
-      if (res.success) {
-        setTickets((prev) => prev.map((t) => (t.id === ticketId ? res.ticket : t)));
-        if (res.stats) setStats(res.stats);
-        showToast(`Work-Order updated to stage "${nextStatus}".`);
-        return;
-      }
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? res.ticket : t)));
+      if (res.stats) setStats(res.stats);
+      showToast(t('app.ticketStageUpdated', { status: t(`enums.ticketStatus.${nextStatus}`) }));
     } catch (err) {
-      console.error('Failed to update ticket via API:', err);
+      showToast(errorText(err), 'error');
     }
-    setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: nextStatus } : t)));
-    showToast(`Work-Order updated to stage "${nextStatus}".`);
   };
 
-  // Add payment deposit via API
-  const handleAddTransaction = async (record: FinancialRecord) => {
+  const handleCreateTicket = async (input: NewTicketInput): Promise<string | null> => {
+    try {
+      const res = await api.createTicket(input);
+      setTickets((prev) => [res.ticket, ...prev]);
+      if (res.stats) setStats(res.stats);
+      showToast(t('app.ticketLogged', { unit: res.ticket.unitNumber }));
+      return null;
+    } catch (err) {
+      return errorText(err);
+    }
+  };
+
+  // Add payment deposit via API. Resolves to an error message, or null on success.
+  const handleAddTransaction = async (record: Partial<FinancialRecord>): Promise<string | null> => {
     try {
       const res = await api.recordTransaction(record);
-      if (res.success) {
-        setTransactions((prev) => [res.transaction, ...prev]);
-        if (res.stats) setStats(res.stats);
-        // Refresh units to reflect cleared arrears
-        api.getUnits().then((u) => setUnits(u));
-        showToast(`Deposit of ${record.amountXAF.toLocaleString()} XAF recorded via ${record.method}.`);
-        return;
-      }
+      setTransactions((prev) => [res.transaction, ...prev]);
+      if (res.stats) setStats(res.stats);
+      // Refresh units to reflect cleared arrears
+      api.getUnits().then(setUnits).catch(() => {});
+      showToast(
+        t('app.depositRecorded', {
+          amount: res.transaction.amountXAF.toLocaleString(locale),
+          method: res.transaction.method
+        })
+      );
+      return null;
     } catch (err) {
-      console.error('Failed to record transaction via API:', err);
+      return errorText(err);
     }
-    setTransactions([record, ...transactions]);
-    showToast(`Deposit of ${record.amountXAF.toLocaleString()} XAF recorded via ${record.method}.`);
   };
 
-  // Update Unit Status or Rent via API
-  const handleUpdateUnitStatus = async (unitId: string, status: Unit['status'], rent?: number) => {
+  // Update a unit (rent, lease, status) via API. Resolves to an error message, or null on success.
+  const handleUpdateUnit = async (unitId: string, updates: Partial<Unit>): Promise<string | null> => {
     try {
-      const res = await api.updateUnit(unitId, { status, rentAmountXAF: rent });
-      if (res.success) {
-        setUnits((prev) => prev.map((u) => (u.id === unitId ? res.unit : u)));
-        if (res.stats) setStats(res.stats);
-        showToast(`Unit status updated to ${status}.`);
-        return;
+      const res = await api.updateUnit(unitId, updates);
+      setUnits((prev) => prev.map((u) => (u.id === unitId ? res.unit : u)));
+      if (res.stats) setStats(res.stats);
+      // Building totals are derived from units on the server.
+      api.getBuildings().then(setBuildings).catch(() => {});
+      if (updates.rentAmountXAF !== undefined) {
+        showToast(
+          t('app.rentUpdated', { unit: res.unit.unitNumber, amount: res.unit.rentAmountXAF.toLocaleString(locale) })
+        );
+      } else if (updates.status === 'Occupied') {
+        showToast(t('app.unitLeased', { unit: res.unit.unitNumber, tenant: res.unit.tenantName ?? '' }));
+      } else {
+        showToast(
+          t('app.unitStatusChanged', { unit: res.unit.unitNumber, status: t(`enums.unitStatus.${res.unit.status}`) })
+        );
       }
+      return null;
     } catch (err) {
-      console.error('Failed to update unit via API:', err);
+      return errorText(err);
     }
-    setUnits((prev) =>
-      prev.map((u) =>
-        u.id === unitId
-          ? {
-              ...u,
-              status,
-              rentAmountXAF: rent !== undefined ? rent : u.rentAmountXAF
-            }
-          : u
-      )
-    );
-    showToast(`Unit status updated to ${status}.`);
   };
 
-  const handleOpenLandlordConsole = (tab: 'overview' | 'ledger' | 'sms' | 'maintenance' | 'units' = 'overview') => {
+  const handleOpenLandlordConsole = (tab: ConsoleTab = 'overview') => {
     setConsoleDefaultTab(tab);
     setIsLandlordConsoleOpen(true);
   };
@@ -234,11 +224,9 @@ export default function App() {
     }
   };
 
-  const scrollToDeveloperSandbox = () => {
-    const el = document.getElementById('developer-sandbox');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
+  const goToCertification = () => {
+    setIsBuildingModalOpen(false);
+    scrollToAgentSection();
   };
 
   return (
@@ -250,28 +238,43 @@ export default function App() {
 
       {/* Fixed Sticky Header */}
       <Navbar
+        user={user}
         agentKYC={agentKYC}
-        onToggleAgentMode={handleToggleAgentMode}
+        onSignIn={openLogin}
+        onSignOut={handleSignOut}
         onOpenBuildingModal={() => setIsBuildingModalOpen(true)}
         onOpenLandlordConsole={() => handleOpenLandlordConsole('overview')}
+        onOpenApprovals={() => handleOpenLandlordConsole('agents')}
         onOpenAgentModal={scrollToAgentSection}
       />
 
       {/* Main Content (Offset for fixed dual-layer navbar) */}
       <main className="flex-1 pt-24 lg:pt-28">
         {/* Toast Alert floating */}
-        {toastMessage && (
-          <div className="fixed top-28 right-4 z-50 max-w-md bg-[#002044] text-white p-4 rounded-2xl shadow-2xl border border-white/20 flex items-center gap-3 animate-fade-in">
-            <CheckCircle2 className="w-5 h-5 text-[#ff9827] shrink-0" />
-            <span className="text-xs font-semibold leading-snug">{toastMessage}</span>
-          </div>
-        )}
+        <div aria-live="polite" role="status" className="contents">
+          {toast && (
+            <div
+              className={`fixed top-28 right-4 z-[70] max-w-md text-white p-4 rounded-2xl shadow-2xl border border-white/20 flex items-center gap-3 animate-fade-in ${
+                toast.kind === 'error' ? 'bg-rose-700' : 'bg-[#002044]'
+              }`}
+            >
+              {toast.kind === 'error' ? (
+                <AlertCircle className="w-5 h-5 text-white shrink-0" aria-hidden="true" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-[#ff9827] shrink-0" aria-hidden="true" />
+              )}
+              <span className="text-xs font-semibold leading-snug">{toast.text}</span>
+            </div>
+          )}
+        </div>
 
         {/* Hero Section with Live Dynamically Recomputed Stats & 3D Interactive Console */}
         <HeroSection
           onRegisterAgentClick={scrollToAgentSection}
           onOpenLandlordConsole={() => handleOpenLandlordConsole('overview')}
           stats={stats}
+          buildings={buildings}
+          transactions={transactions}
           themeMode={themeMode}
           activeTab={activeHeroTab}
           onTabChange={setActiveHeroTab}
@@ -284,9 +287,12 @@ export default function App() {
 
         {/* Certified Agent Network & KYC Registration */}
         <AgentCertificationSection
+          user={user}
           agentKYC={agentKYC}
-          onRegisterAgent={handleRegisterAgent}
+          onSignIn={openLogin}
+          onSubmitApplication={handleSubmitApplication}
           onOpenBuildingModal={() => setIsBuildingModalOpen(true)}
+          onOpenApprovals={() => handleOpenLandlordConsole('agents')}
         />
 
         {/* Developer Hub & Physical Android APK Download Sandbox with Live API Inspector */}
@@ -312,41 +318,47 @@ export default function App() {
       <FuturisticHudDock
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
-        onOpenAgentPortal={scrollToAgentSection}
+        onOpenAgentModal={scrollToAgentSection}
         onOpenLandlordConsole={() => handleOpenLandlordConsole('overview')}
-        onOpenDeveloperSandbox={scrollToDeveloperSandbox}
-        onOpenCadastralRadar={() => {
-          setActiveHeroTab('radar');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        activeHeroTab={activeHeroTab}
+        onSwitchToConsole={() => setActiveHeroTab('console')}
+        onSwitchToRadar={() => setActiveHeroTab('radar')}
       />
 
-      {/* MODAL 1: Certified Agent Building Registration Studio */}
-      <BuildingRegistrationModal
-        isOpen={isBuildingModalOpen}
-        onClose={() => setIsBuildingModalOpen(false)}
-        agentKYC={agentKYC}
-        onAddBuilding={handleAddBuilding}
-        onEnableCertification={() => {
-          setAgentKYC(DEFAULT_CERTIFIED_AGENT);
-          showToast('Certified Agent status activated! You can now register buildings.');
-        }}
-      />
+      {/* MODAL 1: Certified Agent Building Registration Studio (unmounted when closed so the form resets) */}
+      {isBuildingModalOpen && (
+        <BuildingRegistrationModal
+          isOpen={isBuildingModalOpen}
+          onClose={() => setIsBuildingModalOpen(false)}
+          user={user}
+          agentKYC={agentKYC}
+          onAddBuilding={handleAddBuilding}
+          onSignIn={openLogin}
+          onGoToCertification={goToCertification}
+        />
+      )}
 
       {/* MODAL 2: Interactive Landlord Mobile Operations Suite */}
       <LandlordConsoleModal
         isOpen={isLandlordConsoleOpen}
         onClose={() => setIsLandlordConsoleOpen(false)}
         defaultTab={consoleDefaultTab}
+        canEdit={user?.role === 'admin'}
+        onSignIn={openLogin}
         buildings={buildings}
         units={units}
         transactions={transactions}
         tickets={tickets}
         onUpdateTicketStatus={handleUpdateTicketStatus}
+        onCreateTicket={handleCreateTicket}
         onAddTransaction={handleAddTransaction}
-        onUpdateUnitStatus={handleUpdateUnitStatus}
+        onUpdateUnit={handleUpdateUnit}
+        onAgentReviewed={(newStats) => setStats(newStats)}
+        onDownloadError={(message) => showToast(message, 'error')}
       />
+
+      {/* MODAL 3: Sign in */}
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onSignedIn={handleSignedIn} />
     </div>
   );
 }
-

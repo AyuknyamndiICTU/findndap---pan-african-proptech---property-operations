@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { FuturisticTiltCard } from './FuturisticTiltCard';
+import { useI18n } from '../i18n/LanguageContext';
 
 interface LandlordWorkflowSectionProps {
   onOpenLandlordConsole: (defaultTab?: 'overview' | 'ledger' | 'sms' | 'maintenance' | 'units') => void;
@@ -22,6 +23,7 @@ interface LandlordWorkflowSectionProps {
 export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = ({
   onOpenLandlordConsole,
 }) => {
+  const { t } = useI18n();
   return (
     <section id="landlord-solutions" className="py-24 px-4 md:px-8 lg:px-12 bg-[#f2f3ff] relative overflow-hidden">
       {/* Background Cyber Grid */}
@@ -34,15 +36,15 @@ export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = (
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 border border-[#d5e3ff] mb-3 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-[#ff9827] animate-ping" />
               <span className="text-[11px] font-bold text-[#8e4f00] uppercase tracking-wider font-mono">
-                Automated Portfolio Engine
+                {t('workflow.eyebrow')}
               </span>
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-[40px] font-extrabold text-[#002044] tracking-tight leading-tight">
-              Built for Pan-African Property Owners
+              {t('workflow.title')}
             </h2>
           </div>
           <p className="text-[#43474f] max-w-md text-base leading-relaxed">
-            Say goodbye to handwritten receipts, uncollected rents, and unverified tenant inquiries. FindNdap centralizes your rental estate into a single high-precision mobile dashboard.
+            {t('workflow.intro')}
           </p>
         </div>
 
@@ -66,17 +68,17 @@ export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = (
                 style={{ transform: 'translateZ(20px)' }}
                 className="text-lg font-bold text-[#002044] mb-2 group-hover:text-[#ff9827] transition-colors"
               >
-                Digital Portfolio Onboarding
+                {t('workflow.f1Title')}
               </h3>
               <p className="text-sm text-[#43474f] mb-6 leading-relaxed">
-                Eliminate physical paperwork. Digitize multi-unit complexes, configure amenities (borehole, standby genset, 24/7 security guard), upload high-res photos, and toggle unit availability instantly.
+                {t('workflow.f1Body')}
               </p>
             </div>
             <div
               style={{ transform: 'translateZ(25px)' }}
               className="bg-[#f2f3ff] p-2.5 rounded-xl flex items-center justify-between text-[#002044] text-xs font-bold border border-[#eaedff] group-hover:bg-[#eaedff] transition-colors"
             >
-              <span>Dynamic Unit Pricing</span>
+              <span>{t('workflow.f1Tag')}</span>
               <Sliders className="w-3.5 h-3.5 text-[#ff9827]" />
             </div>
           </FuturisticTiltCard>
@@ -99,17 +101,17 @@ export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = (
                 style={{ transform: 'translateZ(20px)' }}
                 className="text-lg font-bold text-[#002044] mb-2 group-hover:text-[#ff9827] transition-colors"
               >
-                Automated MoMo Collection
+                {t('workflow.f2Title')}
               </h3>
               <p className="text-sm text-[#43474f] mb-6 leading-relaxed">
-                Tenants pay directly with MTN Mobile Money or Orange Money. FindNdap automatically reconciles payments into your ledger, generates instant PDF receipts, and flags arrears in real-time.
+                {t('workflow.f2Body')}
               </p>
             </div>
             <div
               style={{ transform: 'translateZ(25px)' }}
               className="bg-[#f2f3ff] p-2.5 rounded-xl flex items-center justify-between text-[#002044] text-xs font-bold border border-[#eaedff] group-hover:bg-[#eaedff] transition-colors"
             >
-              <span>Bank-Grade Escrow Lock</span>
+              <span>{t('workflow.f2Tag')}</span>
               <Lock className="w-3.5 h-3.5 text-emerald-600" />
             </div>
           </FuturisticTiltCard>
@@ -132,17 +134,17 @@ export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = (
                 style={{ transform: 'translateZ(20px)' }}
                 className="text-lg font-bold text-[#002044] mb-2 group-hover:text-[#ff9827] transition-colors"
               >
-                Automated SMS Broadcasts
+                {t('workflow.f3Title')}
               </h3>
               <p className="text-sm text-[#43474f] mb-6 leading-relaxed">
-                Send scheduled rental payment reminders 5 days before due dates. Execute one-click bulk SMS broadcasts to all occupants for building notices, water cuts, or maintenance windows.
+                {t('workflow.f3Body')}
               </p>
             </div>
             <div
               style={{ transform: 'translateZ(25px)' }}
               className="bg-[#f2f3ff] p-2.5 rounded-xl flex items-center justify-between text-[#002044] text-xs font-bold border border-[#eaedff] group-hover:bg-[#eaedff] transition-colors"
             >
-              <span>Direct Telecom Gateway</span>
+              <span>{t('workflow.f3Tag')}</span>
               <Radio className="w-3.5 h-3.5 text-[#002044]" />
             </div>
           </FuturisticTiltCard>
@@ -165,17 +167,17 @@ export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = (
                 style={{ transform: 'translateZ(20px)' }}
                 className="text-lg font-bold text-[#002044] mb-2 group-hover:text-[#ff9827] transition-colors"
               >
-                Centralized Work-Order Hub
+                {t('workflow.f4Title')}
               </h3>
               <p className="text-sm text-[#43474f] mb-6 leading-relaxed">
-                Receive tenant repair tickets with photographic evidence. Track statuses across four stages: Logged → In-Review → Dispatched → Resolved, while logging certified vendor costs.
+                {t('workflow.f4Body')}
               </p>
             </div>
             <div
               style={{ transform: 'translateZ(25px)' }}
               className="bg-[#f2f3ff] p-2.5 rounded-xl flex items-center justify-between text-[#002044] text-xs font-bold border border-[#eaedff] group-hover:bg-[#eaedff] transition-colors"
             >
-              <span>SLA Resolution Tracker</span>
+              <span>{t('workflow.f4Tag')}</span>
               <Clock className="w-3.5 h-3.5 text-[#ff9827]" />
             </div>
           </FuturisticTiltCard>
@@ -192,16 +194,16 @@ export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = (
               <div className="w-full h-80 rounded-2xl overflow-hidden relative shadow-lg group/img">
                 <img
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuDf3WEX1sKc9FkcldI6HjJmX-OpbcplXW1r2hLcq1ooldXoYv_YbrawUjuMlsygNKJ0Kf460FFLoDPgYyNzNJgcB8qfmh8Kg2iFgXi-p-N9wITrUznqZyLK1zRjKEV7_n2SHJZb1InsUvMaY9n_8_yjr0pVgGmaQ36VWoOUrlh9AcHwI3UMW3FbqaxZGrF1f8DHIWv8q1TeqykeD7OkAORRN5mDEKWKglZgTrSHp6FT6xPgduydp3esVw"
-                  alt="Residence Le Cristal • Bonapriso"
+                  alt={t('workflow.showcaseAlt')}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105"
                   loading="lazy"
                 />
                 <div className="absolute top-3 left-3 bg-[#002044]/85 backdrop-blur-md px-3 py-1.5 rounded-xl text-white text-[11px] font-mono font-bold border border-white/15 flex items-center gap-1.5 shadow-md">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  Residence Le Cristal • Bonapriso
+                  {t('workflow.showcaseAlt')}
                 </div>
                 <div className="absolute bottom-3 right-3 bg-[#ff9827] text-white px-3.5 py-1.5 rounded-full text-xs font-bold shadow-lg border border-white/20 font-mono">
-                  100% Occupancy
+                  {t('workflow.occupancy')}
                 </div>
               </div>
             </div>
@@ -209,27 +211,27 @@ export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = (
             <div className="lg:col-span-7 flex flex-col justify-center">
               <div className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-[#8e4f00] uppercase tracking-wider mb-2">
                 <ShieldCheck className="w-4 h-4 text-[#ff9827]" />
-                Cadastral Land Registry Synced
+                {t('workflow.registrySynced')}
               </div>
               <h3 className="text-2xl sm:text-3xl font-extrabold text-[#002044] mb-3 tracking-tight">
-                Every building listed holds verified legal tenure.
+                {t('workflow.showcaseTitle')}
               </h3>
               <p className="text-sm sm:text-base text-[#43474f] mb-6 leading-relaxed">
-                Our automated intake pipeline validates Title Deeds (Titre Foncier) and municipal authorizations before a single unit goes live. Diaspora investors and local renters sign tenancy agreements with absolute confidence.
+                {t('workflow.showcaseBody')}
               </p>
 
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="p-3.5 bg-[#f2f3ff] rounded-2xl text-center border border-[#eaedff] transition-transform hover:scale-105">
                   <span className="text-2xl sm:text-3xl font-extrabold text-[#002044] block font-mono">0%</span>
-                  <span className="text-[11px] text-[#43474f] font-semibold">Listing Fraud</span>
+                  <span className="text-[11px] text-[#43474f] font-semibold">{t('workflow.statFraud')}</span>
                 </div>
                 <div className="p-3.5 bg-[#f2f3ff] rounded-2xl text-center border border-[#eaedff] transition-transform hover:scale-105">
-                  <span className="text-2xl sm:text-3xl font-extrabold text-[#002044] block font-mono">10,400+</span>
-                  <span className="text-[11px] text-[#43474f] font-semibold">Verified Leases</span>
+                  <span className="text-2xl sm:text-3xl font-extrabold text-[#002044] block font-mono">{t('workflow.statLeasesValue')}</span>
+                  <span className="text-[11px] text-[#43474f] font-semibold">{t('workflow.statLeases')}</span>
                 </div>
                 <div className="p-3.5 bg-[#f2f3ff] rounded-2xl text-center border border-[#eaedff] transition-transform hover:scale-105">
                   <span className="text-2xl sm:text-3xl font-extrabold text-[#ff9827] block font-mono">&lt; 15 min</span>
-                  <span className="text-[11px] text-[#43474f] font-semibold">Unit Setup</span>
+                  <span className="text-[11px] text-[#43474f] font-semibold">{t('workflow.statSetup')}</span>
                 </div>
               </div>
 
@@ -238,7 +240,7 @@ export const LandlordWorkflowSection: React.FC<LandlordWorkflowSectionProps> = (
                   onClick={() => onOpenLandlordConsole('overview')}
                   className="group inline-flex items-center gap-2 text-sm font-bold text-[#0f3563] hover:text-[#ff9827] transition-colors"
                 >
-                  <span>Explore Landlord Operations Suite Interactive Demo</span>
+                  <span>{t('workflow.explore')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
                 </button>
               </div>

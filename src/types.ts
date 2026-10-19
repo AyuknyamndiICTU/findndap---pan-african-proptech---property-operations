@@ -30,16 +30,35 @@ export interface Unit {
 }
 
 export interface AgentKYC {
+  userId?: string;
+  username?: string;
   fullName: string;
   agencyName: string;
   licenseId: string;
   city: string;
   momoNumber: string;
   documentName?: string;
+  hasDocument?: boolean;
   isCertified: boolean;
-  status: 'unverified' | 'in-review' | 'certified';
+  status: 'unverified' | 'in-review' | 'certified' | 'rejected';
   badgeId?: string;
   submittedAt?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+}
+
+export type UserRole = 'admin' | 'agent';
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  role: UserRole;
+}
+
+export interface AuthSession {
+  token: string;
+  expiresAt: string;
+  user: AuthUser;
 }
 
 export interface MaintenanceTicket {
@@ -59,6 +78,7 @@ export interface MaintenanceTicket {
 
 export interface FinancialRecord {
   id: string;
+  unitId?: string;
   tenantName: string;
   buildingName: string;
   unitNumber: string;
@@ -114,5 +134,8 @@ export interface MobileConfig {
     sms: string;
     agentKYC: string;
     momoWebhook: string;
+    login: string;
+    logout: string;
+    me: string;
   };
 }

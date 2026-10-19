@@ -1,4 +1,4 @@
-import React, { useRef, useState, MouseEvent } from 'react';
+import React, { useRef, useState, MouseEvent, KeyboardEvent } from 'react';
 
 interface FuturisticTiltCardProps {
   children: React.ReactNode;
@@ -10,6 +10,7 @@ interface FuturisticTiltCardProps {
   holographicBorder?: boolean;
   borderLaser?: boolean;
   hudCorners?: boolean;
+  ariaLabel?: string;
 }
 
 export const FuturisticTiltCard: React.FC<FuturisticTiltCardProps> = ({
@@ -22,6 +23,7 @@ export const FuturisticTiltCard: React.FC<FuturisticTiltCardProps> = ({
   holographicBorder = true,
   borderLaser = false,
   hudCorners = false,
+  ariaLabel,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [rotateX, setRotateX] = useState(0);
@@ -54,6 +56,20 @@ export const FuturisticTiltCard: React.FC<FuturisticTiltCardProps> = ({
     setGlarePos({ x: xPct, y: yPct, opacity: glareOpacity });
   };
 
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick || e.target !== e.currentTarget) return;
+    if (e.key === 'Enter') {
+      onClick();
+    } else if (e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
+  const interactiveProps = onClick
+    ? { role: 'button' as const, tabIndex: 0, onKeyDown: handleKeyDown }
+    : {};
+
   const handleMouseEnter = () => {
     setIsHovered(true);
     setScale(1.02);
@@ -75,6 +91,8 @@ export const FuturisticTiltCard: React.FC<FuturisticTiltCardProps> = ({
       <div
         ref={cardRef}
         onClick={onClick}
+        {...interactiveProps}
+        aria-label={ariaLabel}
         onMouseMove={handleMouseMove}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -88,6 +106,10 @@ export const FuturisticTiltCard: React.FC<FuturisticTiltCardProps> = ({
         className={`relative overflow-hidden preserve-3d will-change-transform ${
           holographicBorder
             ? 'border border-white/20 hover:border-[#ff9827]/60 transition-colors'
+            : ''
+        } ${
+          onClick
+            ? 'focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff9827] focus-visible:ring-4 focus-visible:ring-[#ff9827]/40'
             : ''
         } ${className}`}
       >

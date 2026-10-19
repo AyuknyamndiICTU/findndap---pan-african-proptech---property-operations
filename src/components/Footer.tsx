@@ -1,7 +1,8 @@
 import React from 'react';
 import { BrandLogo } from './BrandLogo';
 import { ShieldCheck, Mail, Phone, MapPin, Download } from 'lucide-react';
-import { downloadFindNdapApk } from '../utils/apkGenerator';
+import { APK_BUILDS, downloadApk } from '../utils/apk';
+import { useI18n } from '../i18n/LanguageContext';
 
 interface FooterProps {
   onOpenAgentModal: () => void;
@@ -12,6 +13,10 @@ export const Footer: React.FC<FooterProps> = ({
   onOpenAgentModal,
   onOpenLandlordConsole,
 }) => {
+  const { t } = useI18n();
+  const stableApk = APK_BUILDS.stable;
+  const rcApk = APK_BUILDS.rc;
+
   return (
     <footer className="bg-[#002044] text-white pt-16 pb-12 border-t border-white/10">
       <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
@@ -20,12 +25,12 @@ export const Footer: React.FC<FooterProps> = ({
           <div className="lg:col-span-2 space-y-4">
             <BrandLogo size="lg" textColor="white" />
             <p className="text-sm text-[#d5e3ff] leading-relaxed max-w-sm">
-              The premier Pan-African property management and cadastral verification ecosystem. Streamlining landlord operations, automated Mobile Money rent collection, and accredited broker building registrations.
+              {t('footer.about')}
             </p>
             <div className="space-y-2 pt-2 text-xs text-[#d5e3ff]">
               <div className="flex items-center gap-2">
                 <MapPin className="w-3.5 h-3.5 text-[#ff9827]" />
-                <span>Akwa Boulevard &amp; Bastos Diplomatic Quarter, Cameroon</span>
+                <span>{t('footer.address')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-[#ff9827]" />
@@ -33,7 +38,7 @@ export const Footer: React.FC<FooterProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-[#ff9827]" />
-                <span>+237 670 00 99 22 (MoMo / WhatsApp Operations)</span>
+                <span>+237 670 00 99 22 {t('footer.phoneNote')}</span>
               </div>
             </div>
           </div>
@@ -41,7 +46,7 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Column 2: Landlords */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff9827]">
-              Landlord Solutions
+              {t('footer.landlordSolutions')}
             </h4>
             <ul className="space-y-2 text-xs text-[#d5e3ff]">
               <li>
@@ -49,27 +54,27 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={onOpenLandlordConsole}
                   className="hover:text-white transition-colors"
                 >
-                  Live Operations Console
+                  {t('footer.liveConsole')}
                 </button>
               </li>
               <li>
                 <a href="#features" className="hover:text-white transition-colors">
-                  Automated MoMo Collection
+                  {t('footer.momoCollection')}
                 </a>
               </li>
               <li>
                 <a href="#features" className="hover:text-white transition-colors">
-                  Direct Bulk SMS Broadcaster
+                  {t('footer.bulkSms')}
                 </a>
               </li>
               <li>
                 <a href="#features" className="hover:text-white transition-colors">
-                  Maintenance Triage System
+                  {t('footer.maintenance')}
                 </a>
               </li>
               <li>
                 <a href="#features" className="hover:text-white transition-colors">
-                  Digital Unit Pricing &amp; Leases
+                  {t('footer.pricing')}
                 </a>
               </li>
             </ul>
@@ -78,7 +83,7 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Column 3: Certified Agents */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff9827]">
-              Certified Agent Portal
+              {t('footer.agentPortal')}
             </h4>
             <ul className="space-y-2 text-xs text-[#d5e3ff]">
               <li>
@@ -86,27 +91,27 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={onOpenAgentModal}
                   className="hover:text-white transition-colors"
                 >
-                  Register as Certified Agent
+                  {t('footer.registerAgent')}
                 </button>
               </li>
               <li>
                 <a href="#agent-portal" className="hover:text-white transition-colors">
-                  Cadastral Title (TF) Verification
+                  {t('footer.tfVerification')}
                 </a>
               </li>
               <li>
                 <a href="#agent-portal" className="hover:text-white transition-colors">
-                  Building Registration Studio
+                  {t('footer.registrationStudio')}
                 </a>
               </li>
               <li>
                 <a href="#agent-portal" className="hover:text-white transition-colors">
-                  Zero-Tolerance Fraud Policy
+                  {t('footer.fraudPolicy')}
                 </a>
               </li>
               <li>
                 <a href="#agent-portal" className="hover:text-white transition-colors">
-                  Direct MoMo Commission Payouts
+                  {t('footer.commissionPayouts')}
                 </a>
               </li>
             </ul>
@@ -115,39 +120,57 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Column 4: Developers */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#ff9827]">
-              Developer Hub &amp; APK
+              {t('footer.developerHub')}
             </h4>
             <ul className="space-y-2 text-xs text-[#d5e3ff]">
               <li>
                 <button
-                  onClick={() => downloadFindNdapApk('1.4.2')}
-                  className="hover:text-white transition-colors flex items-center gap-1.5 font-semibold text-[#ff9827]"
+                  type="button"
+                  onClick={() => downloadApk(stableApk)}
+                  disabled={!stableApk}
+                  aria-disabled={!stableApk}
+                  className={`transition-colors flex items-center gap-1.5 font-semibold text-[#ff9827] ${
+                    stableApk ? 'hover:text-white' : 'opacity-50 cursor-not-allowed'
+                  }`}
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Staging APK (.apk)</span>
+                  <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>
+                    {stableApk
+                      ? stableApk.version
+                        ? t('footer.stagingApkVersion', { version: stableApk.version })
+                        : t('footer.stagingApk')
+                      : t('footer.stagingApkUnavailable')}
+                  </span>
                 </button>
               </li>
               <li>
                 <button
-                  onClick={() => downloadFindNdapApk('1.5.0-rc2')}
-                  className="hover:text-white transition-colors"
+                  type="button"
+                  onClick={() => downloadApk(rcApk)}
+                  disabled={!rcApk}
+                  aria-disabled={!rcApk}
+                  className={`transition-colors ${rcApk ? 'hover:text-white' : 'opacity-50 cursor-not-allowed'}`}
                 >
-                  Release Candidate (v1.5.0-rc)
+                  {rcApk
+                    ? rcApk.version
+                      ? t('footer.releaseCandidateVersion', { version: rcApk.version })
+                      : t('footer.releaseCandidate')
+                    : t('footer.releaseCandidateUnavailable')}
                 </button>
               </li>
               <li>
-                <a href="#developer-hub" className="hover:text-white transition-colors">
-                  MTN MoMo Sandbox Webhooks
+                <a href="#developer-sandbox" className="hover:text-white transition-colors">
+                  {t('footer.momoSandbox')}
                 </a>
               </li>
               <li>
-                <a href="#developer-hub" className="hover:text-white transition-colors">
-                  Orange Money REST Endpoints
+                <a href="#developer-sandbox" className="hover:text-white transition-colors">
+                  {t('footer.orangeEndpoints')}
                 </a>
               </li>
               <li>
-                <a href="#developer-hub" className="hover:text-white transition-colors">
-                  CI/CD Build Pipeline
+                <a href="#developer-sandbox" className="hover:text-white transition-colors">
+                  {t('footer.pipeline')}
                 </a>
               </li>
             </ul>
@@ -159,11 +182,11 @@ export const Footer: React.FC<FooterProps> = ({
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <span>
-              OHADA &amp; CEMAC Compliant Digital Property Leases • Titre Foncier Cadastral Verification
+              {t('footer.compliance')}
             </span>
           </div>
           <div>
-            &copy; {new Date().getFullYear()} FindNdap Inc. All rights reserved. Registered under Pan-African Proptech Accord.
+            {t('footer.copyright', { year: new Date().getFullYear() })}
           </div>
         </div>
       </div>

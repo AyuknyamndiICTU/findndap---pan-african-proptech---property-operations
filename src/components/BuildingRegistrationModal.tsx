@@ -1,23 +1,32 @@
 import React, { useState } from 'react';
-import { Building, Unit, AgentKYC } from '../types';
-import { X, Building2, Plus, Trash2, CheckCircle2, ShieldAlert, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react';
+import { Building, Unit, AgentKYC, AuthUser } from '../types';
+import { X, Building2, Plus, Trash2, CheckCircle2, ShieldAlert, ShieldCheck, LogIn, UploadCloud } from 'lucide-react';
+import { useModalDismiss } from '../utils/useModalDismiss';
+import { useI18n } from '../i18n/LanguageContext';
 
 interface BuildingRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  agentKYC: AgentKYC;
-  onAddBuilding: (building: Building, units: Unit[]) => void;
-  onEnableCertification: () => void;
+  user: AuthUser | null;
+  agentKYC: AgentKYC | null;
+  onAddBuilding: (building: Building, units: Unit[]) => Promise<string | null>;
+  onSignIn: () => void;
+  onGoToCertification: () => void;
 }
 
 export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps> = ({
   isOpen,
   onClose,
+  user,
   agentKYC,
   onAddBuilding,
-  onEnableCertification,
+  onSignIn,
+  onGoToCertification,
 }) => {
+  const { t, label, locale } = useI18n();
   const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+  useModalDismiss(isOpen, onClose);
+  const isCertifiedAgent = user?.role === 'agent' && agentKYC?.status === 'certified';
 
   // Building State
   const [name, setName] = useState('');
@@ -43,6 +52,8 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
 
   // New Unit Form Temporary State
   const [newUnitNumber, setNewUnitNumber] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [newUnitType, setNewUnitType] = useState('2-Bedroom Modern');
   const [newUnitRent, setNewUnitRent] = useState(250000);
 
@@ -86,15 +97,23 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
     setUnits(units.filter((_, i) => i !== index));
   };
 
-  const handleSubmitBuilding = (e: React.FormEvent) => {
+  const handleSubmitBuilding = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    // Implicit submission (Enter key) on earlier steps advances instead of publishing.
+    if (activeStep < 3) {
+      setActiveStep((prev) => (prev + 1) as 1 | 2 | 3);
+      return;
+    }
+    if (!name.trim() || !cadastreNumber.trim()) {
+      setFormError(t('buildingModal.requiredFields'));
+      setActiveStep(1);
+      return;
+    }
+    setFormError(null);
 
-    const buildingId = `bld-${Date.now().toString().slice(-4)}`;
-    const totalRev = units.reduce((acc, curr) => acc + curr.rentAmountXAF, 0);
-
+    // The server assigns the id, totals and "registered by" from the signed-in agent's certification.
     const newBuilding: Building = {
-      id: buildingId,
+      id: '',
       name,
       cadastreNumber,
       city,
@@ -102,18 +121,18 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
       propertyType,
       totalUnits: units.length,
       availableUnits: units.filter((u) => u.status === 'Available').length,
-      monthlyRevenueXAF: totalRev,
+      monthlyRevenueXAF: 0,
       occupancyRate: 0,
       photoUrl,
       amenities,
-      registeredBy: `${agentKYC.fullName} (Cert. #${agentKYC.badgeId || 'AG-8921'})`,
+      registeredBy: '',
       isVerified: true,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: '',
     };
 
-    const createdUnits: Unit[] = units.map((u, idx) => ({
-      id: `u-${Date.now()}-${idx}`,
-      buildingId,
+    const createdUnits: Unit[] = units.map((u) => ({
+      id: '',
+      buildingId: '',
       unitNumber: u.unitNumber,
       type: u.type,
       rentAmountXAF: u.rentAmountXAF,
@@ -121,78 +140,112 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
       balanceDueXAF: 0,
     }));
 
-    onAddBuilding(newBuilding, createdUnits);
+    setSubmitting(true);
+    const error = await onAddBuilding(newBuilding, createdUnits);
+    setSubmitting(false);
+    if (error) {
+      setFormError(error);
+      return;
+    }
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-[#002044]/10 overflow-hidden my-8">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="building-modal-title"
+        className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-[#002044]/10 overflow-hidden my-8"
+      >
         {/* Header */}
         <div className="bg-[#002044] text-white p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#ff9827] text-white flex items-center justify-center shadow-sm">
-              <Building2 className="w-5 h-5" />
+              <Building2 className="w-5 h-5" aria-hidden="true" />
             </div>
             <div>
-              <h2 className="text-xl font-extrabold tracking-tight">Register a Building &amp; Properties</h2>
+              <h2 id="building-modal-title" className="text-xl font-extrabold tracking-tight">{t('buildingModal.title')}</h2>
               <span className="text-xs text-[#d5e3ff]">
-                FindNdap Cadastral Intake Engine • Certified Broker Workspace
+                {t('buildingModal.subtitle')}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label={t('buildingModal.close')}
             className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
         {/* RESTRICTION CHECK: Only Certified Agents Can Register Buildings */}
-        {!agentKYC.isCertified ? (
+        {!isCertifiedAgent ? (
           <div className="p-8 text-center space-y-6">
             <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 mx-auto flex items-center justify-center">
-              <ShieldAlert className="w-8 h-8" />
+              <ShieldAlert className="w-8 h-8" aria-hidden="true" />
             </div>
             <div className="max-w-md mx-auto">
               <h3 className="text-2xl font-bold text-[#002044] mb-2">
-                Certified Agent Verification Required
+                {t('buildingModal.gateTitle')}
               </h3>
               <p className="text-sm text-[#43474f] leading-relaxed">
-                To guarantee 0% listing fraud across Cameroon and Central Africa,{' '}
+                {t('buildingModal.gateIntro')}{' '}
                 <strong className="text-[#002044]">
-                  only verified and accredited real estate agents can register buildings and property units
-                </strong>{' '}
-                into FindNdap.
+                  {t('buildingModal.gateStrong')}
+                </strong>
+                .
+              </p>
+              <p className="text-sm text-[#43474f] leading-relaxed mt-2">
+                {!user
+                  ? t('buildingModal.gateSignIn')
+                  : user.role === 'admin'
+                  ? t('buildingModal.gateAdmin')
+                  : agentKYC?.status === 'in-review'
+                  ? t('buildingModal.gateInReview')
+                  : t('buildingModal.gateApply')}
               </p>
             </div>
 
             <div className="p-4 bg-[#f2f3ff] rounded-2xl border border-[#eaedff] max-w-md mx-auto text-left text-xs text-[#002044] space-y-2">
               <div className="flex items-center gap-2 font-bold text-sm text-[#ff9827]">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Certification Requirements:</span>
+                <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                <span>{t('buildingModal.requirements')}</span>
               </div>
-              <p>• Valid National ID / Passport (CNI)</p>
-              <p>• RCCM / Tax Identification Number (NUI)</p>
-              <p>• Cadastral physical premises inspection by legal desk</p>
+              <p>{t('buildingModal.req1')}</p>
+              <p>{t('buildingModal.req2')}</p>
+              <p>{t('buildingModal.req3')}</p>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <button
-                onClick={() => {
-                  onEnableCertification();
-                }}
-                className="w-full sm:w-auto px-6 py-3 bg-[#ff9827] hover:bg-[#8e4f00] text-white font-bold text-sm rounded-xl shadow-md transition-transform hover:scale-105 flex items-center justify-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Simulate / Unlock Certified Agent Status</span>
-              </button>
+              {!user ? (
+                <button
+                  onClick={onSignIn}
+                  className="w-full sm:w-auto px-6 py-3 bg-[#ff9827] hover:bg-[#8e4f00] text-white font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2"
+                >
+                  <LogIn className="w-4 h-4" aria-hidden="true" />
+                  <span>{t('buildingModal.signIn')}</span>
+                </button>
+              ) : (
+                user.role === 'agent' && (
+                  <button
+                    onClick={onGoToCertification}
+                    className="w-full sm:w-auto px-6 py-3 bg-[#ff9827] hover:bg-[#8e4f00] text-white font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                    <span>{agentKYC?.status === 'in-review' ? t('buildingModal.viewApplication') : t('buildingModal.goToForm')}</span>
+                  </button>
+                )
+              )}
               <button
                 onClick={onClose}
                 className="w-full sm:w-auto px-5 py-3 bg-[#f2f3ff] hover:bg-[#eaedff] text-[#002044] font-semibold text-sm rounded-xl transition-colors"
               >
-                Close &amp; Fill KYC Form
+                {t('buildingModal.close')}
               </button>
             </div>
           </div>
@@ -210,7 +263,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                     : 'border-transparent hover:bg-white/60'
                 }`}
               >
-                1. Building &amp; Title Info
+                {t('buildingModal.step1')}
               </button>
               <button
                 type="button"
@@ -221,7 +274,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                     : 'border-transparent hover:bg-white/60'
                 }`}
               >
-                2. Amenities &amp; Infrastructure
+                {t('buildingModal.step2')}
               </button>
               <button
                 type="button"
@@ -232,23 +285,29 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                     : 'border-transparent hover:bg-white/60'
                 }`}
               >
-                3. Properties &amp; Units ({units.length})
+                {t('buildingModal.step3', { count: units.length })}
               </button>
             </div>
 
             <div className="p-6 max-h-[65vh] overflow-y-auto space-y-6">
+              {formError && (
+                <div role="alert" className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                  {formError}
+                </div>
+              )}
+
               {/* STEP 1: Building & Title Info */}
               {activeStep === 1 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-[#002044] mb-1">
-                        Building Complex Name *
+                        {t('buildingModal.nameLabel')}
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Résidence Victoria Gardens"
+                        placeholder={t('buildingModal.namePlaceholder')}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className="w-full h-11 px-3.5 rounded-xl bg-[#f2f3ff] text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002044] border border-[#eaedff]"
@@ -257,7 +316,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
 
                     <div>
                       <label className="block text-xs font-bold text-[#002044] mb-1">
-                        Cadastral Land Title # (Titre Foncier) *
+                        {t('buildingModal.titleLabel')}
                       </label>
                       <input
                         type="text"
@@ -273,7 +332,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-[#002044] mb-1">
-                        City
+                        {t('buildingModal.city')}
                       </label>
                       <select
                         value={city}
@@ -289,11 +348,11 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
 
                     <div>
                       <label className="block text-xs font-bold text-[#002044] mb-1">
-                        Neighborhood / Quarter
+                        {t('buildingModal.neighborhood')}
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. Bonapriso, Akwa, Bastos"
+                        placeholder={t('buildingModal.neighborhoodPlaceholder')}
                         value={neighborhood}
                         onChange={(e) => setNeighborhood(e.target.value)}
                         className="w-full h-11 px-3.5 rounded-xl bg-[#f2f3ff] text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002044] border border-[#eaedff]"
@@ -302,24 +361,24 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
 
                     <div>
                       <label className="block text-xs font-bold text-[#002044] mb-1">
-                        Property Type
+                        {t('buildingModal.propertyType')}
                       </label>
                       <select
                         value={propertyType}
                         onChange={(e) => setPropertyType(e.target.value as Building['propertyType'])}
                         className="w-full h-11 px-3.5 rounded-xl bg-[#f2f3ff] text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002044] border border-[#eaedff]"
                       >
-                        <option value="Residential Complex">Residential Complex</option>
-                        <option value="Mixed Use">Mixed Use</option>
-                        <option value="Commercial">Commercial</option>
-                        <option value="Student Residence">Student Residence</option>
+                        <option value="Residential Complex">{t('enums.propertyType.Residential Complex')}</option>
+                        <option value="Mixed Use">{t('enums.propertyType.Mixed Use')}</option>
+                        <option value="Commercial">{t('enums.propertyType.Commercial')}</option>
+                        <option value="Student Residence">{t('enums.propertyType.Student Residence')}</option>
                       </select>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-[#002044] mb-1">
-                      Building Photography URL
+                      {t('buildingModal.photoUrl')}
                     </label>
                     <input
                       type="url"
@@ -337,7 +396,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                         }
                         className="text-[11px] text-[#0f3563] bg-[#eaedff] px-2 py-1 rounded"
                       >
-                        Sample 1 (Apartment Complex)
+                        {t('buildingModal.sample1')}
                       </button>
                       <button
                         type="button"
@@ -348,7 +407,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                         }
                         className="text-[11px] text-[#0f3563] bg-[#eaedff] px-2 py-1 rounded"
                       >
-                        Sample 2 (Prestige Manor)
+                        {t('buildingModal.sample2')}
                       </button>
                     </div>
                   </div>
@@ -359,7 +418,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
               {activeStep === 2 && (
                 <div className="space-y-4">
                   <p className="text-xs text-[#43474f]">
-                    Select the utilities and verified amenities available for occupants in this building.
+                    {t('buildingModal.amenitiesIntro')}
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -375,7 +434,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                               : 'bg-[#faf8ff] border-[#eaedff] text-[#43474f]'
                           }`}
                         >
-                          <span className="text-xs">{amenity}</span>
+                          <span className="text-xs">{label('amenities', amenity)}</span>
                           <div
                             className={`w-5 h-5 rounded-md flex items-center justify-center text-xs ${
                               isChecked ? 'bg-[#002044] text-white' : 'border border-[#c3c6d0]'
@@ -396,40 +455,46 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                   {/* Add Unit Form */}
                   <div className="p-4 bg-[#f2f3ff] rounded-2xl border border-[#eaedff]">
                     <div className="font-bold text-xs text-[#002044] uppercase tracking-wider mb-3">
-                      Add Property / Unit to Building
+                      {t('buildingModal.addUnitTitle')}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                       <div>
                         <label className="block text-[11px] font-semibold text-[#43474f] mb-1">
-                          Unit # / Door
+                          {t('buildingModal.unitNumber')}
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. Apt 201"
+                          placeholder={t('buildingModal.unitNumberPlaceholder')}
                           value={newUnitNumber}
                           onChange={(e) => setNewUnitNumber(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddUnit();
+                            }
+                          }}
                           className="w-full h-10 px-3 rounded-lg bg-white text-xs border border-[#c3c6d0]"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-[#43474f] mb-1">
-                          Unit Configuration
+                          {t('buildingModal.unitConfig')}
                         </label>
                         <select
                           value={newUnitType}
                           onChange={(e) => setNewUnitType(e.target.value)}
                           className="w-full h-10 px-3 rounded-lg bg-white text-xs border border-[#c3c6d0]"
                         >
-                          <option value="Studio Deluxe">Studio Deluxe</option>
-                          <option value="1-Bedroom Modern">1-Bedroom Modern</option>
-                          <option value="2-Bedroom Luxury Suite">2-Bedroom Luxury Suite</option>
-                          <option value="3-Bedroom Executive">3-Bedroom Executive</option>
-                          <option value="Commercial Shop">Commercial Shop</option>
+                          <option value="Studio Deluxe">{t('unitTypes.Studio Deluxe')}</option>
+                          <option value="1-Bedroom Modern">{t('unitTypes.1-Bedroom Modern')}</option>
+                          <option value="2-Bedroom Luxury Suite">{t('unitTypes.2-Bedroom Luxury Suite')}</option>
+                          <option value="3-Bedroom Executive">{t('unitTypes.3-Bedroom Executive')}</option>
+                          <option value="Commercial Shop">{t('unitTypes.Commercial Shop')}</option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-[#43474f] mb-1">
-                          Rent (XAF / month)
+                          {t('buildingModal.rent')}
                         </label>
                         <input
                           type="number"
@@ -446,7 +511,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                       className="px-4 py-2 bg-[#002044] hover:bg-[#0f3563] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5 text-[#ff9827]" />
-                      <span>Add Unit to Inventory</span>
+                      <span>{t('buildingModal.addUnit')}</span>
                     </button>
                   </div>
 
@@ -454,10 +519,12 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-xs font-bold text-[#002044]">
-                        Configured Units ({units.length})
+                        {t('buildingModal.configuredUnits', { count: units.length })}
                       </span>
                       <span className="text-xs text-[#747780]">
-                        Total Expected Rent: {units.reduce((a, c) => a + c.rentAmountXAF, 0).toLocaleString()} XAF/mo
+                        {t('buildingModal.totalRent', {
+                          amount: units.reduce((a, c) => a + c.rentAmountXAF, 0).toLocaleString(locale)
+                        })}
                       </span>
                     </div>
 
@@ -473,16 +540,18 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                             </span>
                             <div>
                               <div className="text-xs font-bold text-[#002044]">{unit.unitNumber}</div>
-                              <div className="text-[11px] text-[#747780]">{unit.type}</div>
+                              <div className="text-[11px] text-[#747780]">{label('unitTypes', unit.type)}</div>
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
                             <span className="text-xs font-extrabold text-[#ff9827]">
-                              {unit.rentAmountXAF.toLocaleString()} XAF/mo
+                              {t('buildingModal.unitRent', { amount: unit.rentAmountXAF.toLocaleString(locale) })}
                             </span>
                             <button
                               type="button"
                               onClick={() => handleRemoveUnit(idx)}
+                              aria-label={t('buildingModal.removeUnit', { unit: unit.unitNumber })}
+                              title={t('buildingModal.removeUnit', { unit: unit.unitNumber })}
                               className="text-red-500 hover:text-red-700 p-1"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -504,28 +573,33 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
                   onClick={() => setActiveStep((prev) => (prev - 1) as 1 | 2 | 3)}
                   className="px-4 py-2.5 rounded-xl border border-[#c3c6d0] text-xs font-bold text-[#002044] hover:bg-white"
                 >
-                  Back
+                  {t('buildingModal.back')}
                 </button>
               ) : (
                 <div />
               )}
 
               <div className="flex items-center gap-3">
+                {/* Distinct keys stop React reusing one DOM node; otherwise the click on
+                    "Next: Units" lands on a node that became type="submit" and publishes early. */}
                 {activeStep < 3 ? (
                   <button
+                    key="next-step"
                     type="button"
                     onClick={() => setActiveStep((prev) => (prev + 1) as 1 | 2 | 3)}
                     className="px-5 py-2.5 rounded-xl bg-[#002044] text-white text-xs font-bold hover:bg-[#0f3563]"
                   >
-                    Next: {activeStep === 1 ? 'Amenities' : 'Units'}
+                    {activeStep === 1 ? t('buildingModal.nextAmenities') : t('buildingModal.nextUnits')}
                   </button>
                 ) : (
                   <button
+                    key="publish"
                     type="submit"
+                    disabled={submitting}
                     className="px-6 py-2.5 rounded-xl bg-[#ff9827] hover:bg-[#8e4f00] text-white text-xs font-bold shadow-md transition-all hover:scale-105 flex items-center gap-2"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Publish Building to Cadastral Database</span>
+                    <span>{t('buildingModal.publish')}</span>
                   </button>
                 )}
               </div>

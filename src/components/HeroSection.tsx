@@ -17,13 +17,15 @@ import {
   Zap,
   Globe
 } from 'lucide-react';
-import { downloadFindNdapApk } from '../utils/apkGenerator';
+import { APK_BUILDS, downloadApk } from '../utils/apk';
+import { formatXaf } from '../utils/format';
 import { BrandLogo } from './BrandLogo';
-import { DashboardStats } from '../types';
+import { Building, DashboardStats, FinancialRecord } from '../types';
 import { FuturisticTiltCard } from './FuturisticTiltCard';
-import { CadastralRadarHologram } from './CadastralRadarHologram';
+import { CadastralRadarHologram, formatCoordinates, getCityCoordinates } from './CadastralRadarHologram';
 import { FloatingHolographicBadge } from './FloatingHolographicBadge';
 import { GlowingPortalRing } from './GlowingPortalRing';
+import { useI18n } from '../i18n/LanguageContext';
 
 interface HeroSectionProps {
   onRegisterAgentClick: () => void;
@@ -32,6 +34,8 @@ interface HeroSectionProps {
   themeMode?: 'dark' | 'light';
   activeTab?: 'console' | 'radar';
   onTabChange?: (tab: 'console' | 'radar') => void;
+  buildings?: Building[];
+  transactions?: FinancialRecord[];
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
@@ -41,7 +45,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   themeMode = 'light',
   activeTab: controlledActiveTab,
   onTabChange,
+  buildings = [],
+  transactions = [],
 }) => {
+  const { t, locale } = useI18n();
+  const num = (value: number) => value.toLocaleString(locale);
   const sectionRef = useRef<HTMLElement>(null);
   const [internalActiveTab, setInternalActiveTab] = useState<'console' | 'radar'>('console');
   const activeTab = controlledActiveTab ?? internalActiveTab;
@@ -71,6 +79,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
   const isDark = themeMode === 'dark';
 
+  const apkBuild = APK_BUILDS.stable;
+  // Lists arrive newest-first from the API.
+  const featuredBuilding = buildings[0];
+  const latestSettlement = transactions.find((tx) => tx.status === 'Completed');
+  const featuredCity = featuredBuilding ? getCityCoordinates(featuredBuilding.city) : null;
+  const collectionBarPercent = stats ? Math.min(100, Math.max(0, stats.collectionRatePercent || 0)) : 0;
+
   return (
     <section
       ref={sectionRef}
@@ -96,7 +111,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           FINDNDAP
         </div>
         <div className="text-[10px] sm:text-xs font-mono tracking-[0.4em] text-[#ff9827] uppercase opacity-65 -mt-2 sm:-mt-8 font-bold">
-          CADASTRAL TRUST NETWORK • CEMAC COMPLIANT
+          {t('hero.watermarkTagline')}
         </div>
       </div>
 
@@ -127,7 +142,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ff9827]" />
               </span>
               <span className="text-[11px] font-bold uppercase tracking-wider">
-                Pan-African Proptech &amp; Cadastral Trust Network
+                {t('hero.badge')}
               </span>
               <ShieldCheck className="w-3.5 h-3.5 text-[#ff9827]" />
             </div>
@@ -138,9 +153,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 isDark ? 'text-white' : 'text-[#002044]'
               }`}
             >
-              Transforming African Real Estate Management{' '}
+              {t('hero.titleMain')}{' '}
               <span className="relative inline-block text-[#ff9827]">
-                from Your Pocket
+                {t('hero.titleAccent')}
                 <svg
                   className="absolute -bottom-2 left-0 w-full h-2 text-[#ff9827]/40"
                   viewBox="0 0 100 10"
@@ -157,7 +172,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 isDark ? 'text-gray-300' : 'text-[#43474f]'
               }`}
             >
-              Centralized property operations, automated Mobile Money rent collection, verified tenant management, and strict certified agent building registration — all unified in one robust mobile ecosystem.
+              {t('hero.subtitle')}
             </p>
 
             {/* Dual CTAs with 3D Hover Depth */}
@@ -170,22 +185,31 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <div className="absolute -inset-full bg-gradient-to-r from-transparent via-white/25 to-transparent rotate-45 group-hover:translate-x-full transition-transform duration-1000" />
                 
                 <div className="relative z-10 flex items-center justify-between gap-3">
-                  <span className="text-sm font-bold tracking-wide">Register as Certified Agent</span>
+                  <span className="text-sm font-bold tracking-wide">{t('hero.registerAgent')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
                 </div>
                 <span className="relative z-10 text-xs opacity-90 font-normal mt-0.5">
-                  Get verified to list buildings &amp; properties
+                  {t('hero.registerAgentSub')}
                 </span>
               </button>
 
               <button
-                onClick={() => downloadFindNdapApk('1.4.2')}
-                className="group relative overflow-hidden flex items-center justify-center gap-3 px-6 py-3.5 bg-[#0f3563] text-white hover:bg-[#002044] rounded-2xl shadow-md transition-all duration-300 hover:scale-[1.03] border border-white/15"
+                type="button"
+                onClick={() => downloadApk(apkBuild)}
+                disabled={!apkBuild}
+                aria-disabled={!apkBuild}
+                className={`group relative overflow-hidden flex items-center justify-center gap-3 px-6 py-3.5 bg-[#0f3563] text-white rounded-2xl shadow-md transition-all duration-300 border border-white/15 ${
+                  apkBuild ? 'hover:bg-[#002044] hover:scale-[1.03]' : 'opacity-50 cursor-not-allowed'
+                }`}
               >
-                <Smartphone className="w-5 h-5 text-[#ff9827] group-hover:rotate-12 transition-transform" />
+                <Smartphone className="w-5 h-5 text-[#ff9827] group-hover:rotate-12 transition-transform" aria-hidden="true" />
                 <div className="flex flex-col text-left">
-                  <span className="text-sm font-bold leading-tight">Download Developer APK</span>
-                  <span className="text-[11px] text-[#c9e6ff] font-normal">v1.4.2 • QA Sandbox</span>
+                  <span className="text-sm font-bold leading-tight">
+                    {apkBuild ? t('hero.downloadApk') : t('hero.apkUnavailable')}
+                  </span>
+                  {apkBuild?.version && (
+                    <span className="text-[11px] text-[#c9e6ff] font-normal">v{apkBuild.version}</span>
+                  )}
                 </div>
               </button>
             </div>
@@ -202,7 +226,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     isDark ? 'text-gray-400' : 'text-[#747780]'
                   }`}
                 >
-                  Settlement:
+                  {t('hero.settlement')}
                 </span>
                 <span className="px-2.5 py-1 bg-white rounded-lg text-xs font-bold text-[#131b2e] flex items-center gap-1.5 border border-[#d5e3ff] shadow-2xs hover:scale-105 transition-transform">
                   <span className="w-2 h-2 rounded-full bg-[#ffcc00] animate-pulse" />
@@ -214,7 +238,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </span>
                 <span className="px-2.5 py-1 bg-white rounded-lg text-xs font-bold text-[#131b2e] flex items-center gap-1.5 border border-[#d5e3ff] shadow-2xs">
                   <Lock className="w-3 h-3 text-[#002044]" />
-                  Escrow Lock
+                  {t('hero.escrowLock')}
                 </span>
               </div>
 
@@ -227,6 +251,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 }`}
               >
                 <button
+                  type="button"
+                  aria-pressed={activeTab === 'console'}
                   onClick={() => handleTabToggle('console')}
                   className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                     activeTab === 'console'
@@ -237,9 +263,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   }`}
                 >
                   <Smartphone className="w-3.5 h-3.5 text-[#ff9827]" />
-                  <span>Mobile Hub</span>
+                  <span>{t('hero.mobileHub')}</span>
                 </button>
                 <button
+                  type="button"
+                  aria-pressed={activeTab === 'radar'}
                   onClick={() => handleTabToggle('radar')}
                   className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                     activeTab === 'radar'
@@ -250,7 +278,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   }`}
                 >
                   <Radio className="w-3.5 h-3.5 text-[#ff9827] animate-pulse" />
-                  <span>3D Radar HUD</span>
+                  <span>{t('hero.radarHud')}</span>
                 </button>
               </div>
             </div>
@@ -266,7 +294,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {/* FLOATING HOLOGRAPHIC BADGES (Breaking outer card borders with 3D parallax) */}
               {activeTab === 'console' && (
                 <>
-                  {/* Floating Chip 1: Cadastral Title Foncier verified (Top-Left Outward Float) */}
+                  {/* Floating Chip 1: Cadastral Title Foncier of the newest building (Top-Left Outward Float) */}
+                  {featuredBuilding?.cadastreNumber && (
                   <FloatingHolographicBadge
                     className="-top-5 -left-6 z-40 hidden sm:block"
                     depth={60}
@@ -278,16 +307,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       </div>
                       <div>
                         <div className="text-[10px] font-mono font-bold text-emerald-700 uppercase leading-none">
-                          Titre Foncier Sync
+                          {t('hero.tfSync')}
                         </div>
                         <div className="text-xs font-bold text-[#002044] font-mono mt-0.5">
-                          TF-DLA/2024/77812
+                          {featuredBuilding.cadastreNumber}
                         </div>
                       </div>
                     </div>
                   </FloatingHolographicBadge>
+                  )}
 
-                  {/* Floating Chip 2: MoMo Instant Settlement (Bottom-Right Outward Float) */}
+                  {/* Floating Chip 2: Latest completed MoMo settlement (Bottom-Right Outward Float) */}
+                  {latestSettlement && (
                   <FloatingHolographicBadge
                     className="-bottom-6 -right-6 z-40 hidden sm:block"
                     depth={70}
@@ -300,16 +331,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       </div>
                       <div>
                         <div className="text-[10px] font-mono font-bold text-[#ff9827] uppercase leading-none">
-                          MoMo Auto-Settled
+                          {t('hero.momoSettled')}
                         </div>
                         <div className="text-xs font-bold text-[#002044] font-mono mt-0.5">
-                          +250,000 XAF Reconciled
+                          {t('hero.reconciledAmount', { amount: formatXaf(latestSettlement.amountXAF, locale) })}
                         </div>
                       </div>
                     </div>
                   </FloatingHolographicBadge>
+                  )}
 
-                  {/* Floating Chip 3: GPS Satellite Geo-Lock (Middle-Right Float) */}
+                  {/* Floating Chip 3: GPS of the newest building's city (Middle-Right Float) */}
+                  {featuredCity && (
                   <FloatingHolographicBadge
                     className="top-1/3 -right-8 z-40 hidden lg:block"
                     depth={50}
@@ -317,9 +350,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   >
                     <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-[#002044]">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                      <span>GPS 4.0511°N, 9.7679°E</span>
+                      <span>{t('hero.gps', { coords: formatCoordinates(featuredCity.lat, featuredCity.lng) })}</span>
                     </div>
                   </FloatingHolographicBadge>
+                  )}
                 </>
               )}
 
@@ -327,6 +361,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {activeTab === 'console' && (
                 <FuturisticTiltCard
                   onClick={onOpenLandlordConsole}
+                  ariaLabel={t('hero.openConsole')}
                   maxTilt={12}
                   perspective={1200}
                   glareOpacity={0.28}
@@ -337,16 +372,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   {/* Click prompt overlay with neon accent */}
                   <div className="absolute top-3 right-4 z-30 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center gap-1.5 bg-[#002044] text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg border border-[#ff9827]/50">
                     <Sparkles className="w-3 h-3 text-[#ff9827] animate-spin" />
-                    <span>Launch Interactive Console</span>
+                    <span>{t('hero.launchConsole')}</span>
                     <ArrowUpRight className="w-3.5 h-3.5 text-[#ff9827]" />
                   </div>
 
                   {/* Simulated Smartphone Status Bar */}
                   <div className="flex justify-between items-center px-1 mb-3 text-[10px] font-mono text-[#747780]">
-                    <span>9:41 AM • 4G+ LTE</span>
+                    <span>{t('hero.statusBarTime')}</span>
                     <span className="flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      100% Charged
+                      {t('hero.charged')}
                     </span>
                   </div>
 
@@ -357,15 +392,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         <BrandLogo size="sm" showText={false} />
                       </div>
                       <div>
-                        <div className="text-base font-bold text-[#002044] leading-tight">FindNdap Mobile</div>
+                        <div className="text-base font-bold text-[#002044] leading-tight">{t('hero.appName')}</div>
                         <div className="text-[11px] font-bold text-[#ff9827] flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                          Live Operations Center
+                          {t('hero.liveCenter')}
                         </div>
                       </div>
                     </div>
                     <span className="px-2.5 py-1 rounded-full bg-[#002044] text-white text-[10px] font-bold uppercase tracking-wider shadow-xs">
-                      Yaoundé HQ
+                      {t('hero.hq')}
                     </span>
                   </div>
 
@@ -373,35 +408,35 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="p-3.5 rounded-2xl bg-[#f2f3ff] border border-[#eaedff] flex flex-col justify-between group-hover:border-[#ff9827]/30 transition-colors">
                       <div className="flex items-center justify-between text-[#43474f]">
-                        <span className="text-xs font-semibold">Active Buildings</span>
+                        <span className="text-xs font-semibold">{t('hero.activeBuildings')}</span>
                         <span className="text-[10px] font-bold font-mono text-[#002044] bg-white px-1.5 py-0.5 rounded shadow-2xs">
-                          TF Synced
+                          {t('hero.tfSynced')}
                         </span>
                       </div>
                       <div className="mt-2">
                         <div className="text-2xl font-extrabold text-[#002044] tracking-tight">
-                          {stats ? `${stats.totalBuildings} Properties` : '1,480+'}
+                          {stats ? t('hero.properties', { count: num(stats.totalBuildings) }) : '—'}
                         </div>
                         <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          {stats ? `${stats.totalUnits} Units Total` : '↑ +18.2% this month'}
+                          {stats ? t('hero.unitsTotal', { count: num(stats.totalUnits) }) : t('hero.awaitingData')}
                         </span>
                       </div>
                     </div>
 
                     <div className="p-3.5 rounded-2xl bg-[#f2f3ff] border border-[#eaedff] flex flex-col justify-between group-hover:border-[#ff9827]/30 transition-colors">
                       <div className="flex items-center justify-between text-[#43474f]">
-                        <span className="text-xs font-semibold">Occupancy</span>
+                        <span className="text-xs font-semibold">{t('hero.occupancy')}</span>
                         <span className="text-[10px] font-bold font-mono text-[#ff9827] bg-white px-1.5 py-0.5 rounded shadow-2xs">
-                          Live
+                          {t('hero.live')}
                         </span>
                       </div>
                       <div className="mt-2">
                         <div className="text-2xl font-extrabold text-[#ff9827] tracking-tight">
-                          {stats ? `${stats.occupancyRate}%` : '98.4%'}
+                          {stats ? t('hero.percent', { value: num(stats.occupancyRate) }) : '—'}
                         </div>
                         <span className="text-[11px] font-bold text-[#002044]">
-                          {stats ? `${stats.collectionRatePercent}% Collected` : 'Automated Ledger'}
+                          {stats ? t('hero.collected', { percent: num(stats.collectionRatePercent) }) : t('hero.automatedLedger')}
                         </span>
                       </div>
                     </div>
@@ -413,14 +448,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[#d5e3ff] flex items-center gap-1.5">
                           <Activity className="w-3.5 h-3.5 text-[#ff9827] animate-pulse" />
-                          Live Automated Ledger (Current Month)
+                          {t('hero.ledgerTitle')}
                         </span>
                         <div className="text-xl font-extrabold mt-0.5 font-mono">
-                          XAF {stats ? stats.collectedRevenueXAF.toLocaleString() : '14,850,000'}
+                          {stats ? formatXaf(stats.collectedRevenueXAF, locale) : '— XAF'}
                         </div>
                       </div>
                       <span className="px-2.5 py-0.5 rounded-md bg-[#ff9827] text-white text-[10px] font-bold font-mono shadow-xs">
-                        Instant Payout
+                        {t('hero.instantPayout')}
                       </span>
                     </div>
 
@@ -429,17 +464,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <div
                         className="bg-gradient-to-r from-[#ff9827] to-amber-300 h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_#ff9827]"
                         style={{
-                          width: stats
-                            ? `${Math.min(100, Math.max(15, stats.collectionRatePercent || stats.occupancyRate))}%`
-                            : '92%'
+                          width: `${collectionBarPercent}%`
                         }}
                       />
                     </div>
 
                     <div className="flex justify-between items-center text-xs mt-2 text-[#d5e3ff] font-mono">
-                      <span>{stats ? `${stats.collectedUnitsCount} Reconciled` : '84 Units Collected'}</span>
+                      <span>{stats ? t('hero.reconciled', { count: num(stats.collectedUnitsCount) }) : t('hero.reconciledEmpty')}</span>
                       <span className="text-amber-300 font-semibold">
-                        {stats ? `${stats.pendingArrearsUnitsCount} in Arrears` : '7 Pending'}
+                        {stats ? t('hero.inArrears', { count: num(stats.pendingArrearsUnitsCount) }) : t('hero.inArrearsEmpty')}
                       </span>
                     </div>
                   </div>
@@ -451,18 +484,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         <Wrench className="w-4 h-4 text-[#ff9827]" />
                       </div>
                       <div>
-                        <span className="text-xs font-bold text-[#002044] block">Avg. Maintenance Triage</span>
+                        <span className="text-xs font-bold text-[#002044] block">{t('hero.maintenance')}</span>
                         <span className="text-[11px] text-[#43474f]">
-                          {stats ? `${stats.activeTicketsCount} Active Work-Orders` : 'Photo verification to dispatch'}
+                          {stats ? t('hero.activeWorkOrders', { count: num(stats.activeTicketsCount) }) : t('hero.photoVerification')}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-base font-bold text-[#002044] font-mono">
-                        {stats ? `${stats.resolvedTicketsCount} Fixed` : '4.2h'}
+                        {stats ? t('hero.fixed', { count: num(stats.resolvedTicketsCount) }) : '—'}
                       </div>
                       <span className="text-[10px] font-bold text-emerald-700 uppercase font-mono">
-                        Real-time SLA
+                        {t('hero.sla')}
                       </span>
                     </div>
                   </div>
@@ -472,7 +505,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {/* TAB 2: 3D Cadastral Radar Hologram HUD */}
               {activeTab === 'radar' && (
                 <div className="relative">
-                  <CadastralRadarHologram />
+                  <CadastralRadarHologram buildings={buildings} />
                 </div>
               )}
             </div>

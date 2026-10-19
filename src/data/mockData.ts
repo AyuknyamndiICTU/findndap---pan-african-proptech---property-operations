@@ -1,4 +1,5 @@
-import { Building, MaintenanceTicket, FinancialRecord, Unit, AgentKYC } from '../types';
+// Seed data written to the SQLite database the first time the server starts with an empty database.
+import { Building, MaintenanceTicket, FinancialRecord, Unit, BulkSmsNotice } from '../types';
 
 export const INITIAL_BUILDINGS: Building[] = [
   {
@@ -119,7 +120,7 @@ export const INITIAL_TRANSACTIONS: FinancialRecord[] = [
     unitNumber: 'Apt 101',
     amountXAF: 300000,
     method: 'MTN MoMo',
-    date: 'Today, 08:14 AM',
+    date: '2025-09-08T08:14:00.000Z',
     status: 'Completed',
     txRef: 'MOMO-CMR-9821498'
   },
@@ -130,7 +131,7 @@ export const INITIAL_TRANSACTIONS: FinancialRecord[] = [
     unitNumber: 'Apt 102',
     amountXAF: 450000,
     method: 'Orange Money',
-    date: 'Yesterday, 17:30 PM',
+    date: '2025-09-07T17:30:00.000Z',
     status: 'Completed',
     txRef: 'OM-CMR-4109823'
   },
@@ -141,7 +142,7 @@ export const INITIAL_TRANSACTIONS: FinancialRecord[] = [
     unitNumber: 'Suite 302',
     amountXAF: 320000,
     method: 'MTN MoMo',
-    date: '05 Sep 2025',
+    date: '2025-09-05T10:00:00.000Z',
     status: 'Escrow_Locked',
     txRef: 'ESCROW-9831-MOMO'
   },
@@ -152,7 +153,7 @@ export const INITIAL_TRANSACTIONS: FinancialRecord[] = [
     unitNumber: 'Apt 103',
     amountXAF: 220000,
     method: 'MTN MoMo',
-    date: 'Overdue (5 days)',
+    date: '2025-09-03T09:00:00.000Z',
     status: 'Arrears',
     txRef: 'PENDING_REMINDER_SENT'
   }
@@ -167,7 +168,7 @@ export const INITIAL_TICKETS: MaintenanceTicket[] = [
     category: 'Plumbing',
     description: 'Borehole booster pump valve pressure drop in master bathroom',
     status: 'In-Review',
-    reportedDate: 'Today, 09:20 AM',
+    reportedDate: '2025-09-08T09:20:00.000Z',
     urgency: 'Medium',
     assignedVendor: 'Ets. Plomberie Centrale Douala',
     costXAF: 35000,
@@ -181,7 +182,7 @@ export const INITIAL_TICKETS: MaintenanceTicket[] = [
     category: 'Electrical',
     description: 'Automatic transfer switch tripping during ENEO grid transition',
     status: 'Dispatched',
-    reportedDate: 'Yesterday',
+    reportedDate: '2025-09-07T15:00:00.000Z',
     urgency: 'High',
     assignedVendor: 'Electro-Services Littoral',
     costXAF: 65000,
@@ -195,22 +196,30 @@ export const INITIAL_TICKETS: MaintenanceTicket[] = [
     category: 'Security',
     description: 'Digital intercom gate buzzer speaker crackling on visitor call',
     status: 'Resolved',
-    reportedDate: '04 Sep 2025',
+    reportedDate: '2025-09-04T11:00:00.000Z',
     urgency: 'Low',
     assignedVendor: 'SafeCam Surveillance Tech',
     costXAF: 20000
   }
 ];
 
-export const DEFAULT_CERTIFIED_AGENT: AgentKYC = {
-  fullName: 'Béatrice Mengue',
-  agencyName: 'Yaoundé Realty & Asset Partners',
-  licenseId: 'RC/YDE/2021/B/8492',
-  city: 'Yaoundé (Centre, Cameroon)',
-  momoNumber: '+237 677 44 55 66',
-  documentName: 'RCCM_License_Cadastral_2025.pdf',
-  isCertified: true,
-  status: 'certified',
-  badgeId: 'FND-CERT-2025-0849',
-  submittedAt: '2025-01-12'
-};
+export const INITIAL_SMS_NOTICES: BulkSmsNotice[] = [
+  {
+    id: 'sms-001',
+    title: 'September Rent Collection Notice',
+    message:
+      'Dear Occupant, rental reconciliation for September 2025 is underway. Please initiate your settlement via MTN MoMo (*126#) or Orange Money (#150#) to auto-generate your instant digital receipt. FindNdap Operations.',
+    target: 'All Building Tenants',
+    recipientCount: 3,
+    sentAt: '2025-09-01T08:30:00.000Z'
+  },
+  {
+    id: 'sms-002',
+    title: 'Scheduled Forage Booster Servicing',
+    message:
+      'Water booster pump maintenance scheduled today from 14:00 to 16:30 at Résidence Le Cristal. Underground reservoir tanks will remain active. - Management',
+    target: 'Résidence Le Cristal',
+    recipientCount: 3,
+    sentAt: '2025-09-04T10:15:00.000Z'
+  }
+];

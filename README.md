@@ -20,10 +20,17 @@ The platform bridges real-time Mobile Money rent settlements (MTN MoMo & Orange 
    - **Agent Accreditation KYC**: Broker intake capturing RCCM/NUI commercial registration, jurisdiction, and Mobile Money commission payout details.
    - **Building Publishing Studio**: Digital onboarding for residential and commercial multi-unit properties, including infrastructure amenities (borehole/forage, generator, 24/7 security, solar inverter).
 
-3. **Developer Hub & Android Staging APK Generator**
-   - **Direct Sideload APK Download**: Instant browser-triggered download of `FindNdap-Mobile-v1.4.2-staging.apk` with verified SHA-256 package checksums.
-   - **Payment Webhook Simulator**: Interactive test bench simulating incoming MTN MoMo callback payloads with copyable cURL commands.
-   - **Release Candidate Channels**: Early access to v1.5.0-rc builds and staging changelogs.
+3. **Developer Hub & Android App Download**
+   - **Android APK Download**: Download buttons serve the real build configured in `.env` (`VITE_APK_URL`); until one is published they show "APK not available yet".
+   - **Payment Webhook Simulator**: Interactive test bench (administrator only, disabled in production) simulating incoming MTN MoMo callback payloads, with copyable cURL commands for the secret-protected webhook.
+   - **Live REST API Inspector**: Calls the public read endpoints and shows the JSON responses.
+
+4. **Accounts, Persistence & Languages**
+   - **Role-based logins**: A landlord/administrator account and agent accounts, configured in `.env`. Reading is public; every change requires signing in.
+   - **Real certification review**: Agents upload an ID document and apply; an administrator reviews the document and approves or rejects the application.
+   - **SQLite database**: All data survives restarts (`data/findndap.db`), seeded with demo data on first start.
+   - **PDF receipts**: Downloadable rent receipts for completed payments, in English or French.
+   - **English / French interface**: The EN/FR switch translates the whole interface, and server messages follow the chosen language.
 
 ---
 
@@ -31,6 +38,8 @@ The platform bridges real-time Mobile Money rent settlements (MTN MoMo & Orange 
 
 - **Framework**: [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
 - **Bundler & Dev Server**: [Vite 6](https://vite.dev/)
+- **API Server**: [Express 4](https://expressjs.com/)
+- **Database**: SQLite via [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Animations**: [Motion](https://motion.dev/)
@@ -42,14 +51,14 @@ The platform bridges real-time Mobile Money rent settlements (MTN MoMo & Orange 
 
 Before running the project locally, ensure your computer has:
 
-- **Node.js**: Version **18.x**, **20.x**, or newer (LTS recommended)
+- **Node.js**: Version **22** or newer (required by the SQLite driver, `better-sqlite3`)
   - Download from [nodejs.org](https://nodejs.org/)
   - Verify installation in your terminal:
     ```bash
     node -v
     npm -v
     ```
-- **Package Manager**: `npm` (comes bundled with Node.js), `yarn`, `pnpm`, or `bun`
+- **Package Manager**: `npm` (comes bundled with Node.js). `yarn` and `pnpm` also work; Bun is not supported because `better-sqlite3` is a native Node.js module.
 
 ---
 
@@ -111,14 +120,29 @@ yarn install
 
 # Using pnpm
 pnpm install
-
-# Using Bun
-bun install
 ```
 
 ---
 
-### Step 5: Start the Local Full-Stack Server
+### Step 5: Create Your Configuration (`.env`)
+
+```bash
+npm run setup
+```
+
+This copies `.env.example` to `.env`, generates a random administrator password and webhook secret, and prints the admin password **once**, so store it. It never overwrites an existing `.env` (use `npm run setup -- --force` to regenerate).
+
+Then open `.env` and add agent accounts if you need them:
+
+```dotenv
+AGENT_ACCOUNTS="beatrice:a-strong-password,etienne:another-password"
+```
+
+Accounts are re-read from `.env` at every start: changing a password there changes it in the app, and removing an account disables it. Passwords must be at least 8 characters.
+
+---
+
+### Step 6: Start the Local Full-Stack Server
 
 Run the development command:
 
@@ -126,16 +150,18 @@ Run the development command:
 npm run dev
 ```
 
-This single command executes `tsx server.ts`, which boots up both the Express backend API engine and Vite's frontend server simultaneously on port **3000**.
+This starts the Express API and Vite's frontend dev server together on port **3000** (set `PORT` in `.env` to change it). On first start it creates the SQLite database in `data/` and fills it with demo buildings, units, payments and work-orders.
 
 You will see terminal output:
 ```text
 FindNdap Core Full-Stack Server running at http://0.0.0.0:3000
 ```
 
+If an account in `.env` is invalid (for example a password shorter than 8 characters), a warning starting with `[auth]` is printed and that account is skipped.
+
 ---
 
-### Step 6: View the App in Your Browser
+### Step 7: View the App in Your Browser
 
 Open your web browser (Chrome, Edge, Firefox, Safari, Brave) and navigate to:
 ```text
@@ -148,7 +174,7 @@ http://localhost:3000
 
 ---
 
-### Step 7: Production Build & Deployment
+### Step 8: Production Build & Deployment
 
 To verify or test a standalone production build:
 
@@ -160,18 +186,22 @@ npm run build
 npm start
 ```
 
+The production server runs from the project folder, serves the built files from `dist/`, and reads the same `.env` and `data/` folder. Set `VITE_APK_URL` **before** `npm run build` if you want the APK buttons enabled (it is baked into the client bundle). In production the in-browser payment simulator (`/api/momo/simulate`) is disabled.
+
 ---
 
 ## 📜 Available NPM Scripts
 
 | Script | Command | Description |
 | :--- | :--- | :--- |
-| **Full-Stack Dev Server** | `npm run dev` | Boots up the unified Express API server & Vite hot-reload frontend on port 3000 |
-| **Production Build** | `npm run build` | Compiles frontend static assets to `/dist` and bundles `server.ts` to `dist/server.cjs` via esbuild |
-| **Start Production** | `npm start` | Launches the compiled standalone Node.js production server (`node dist/server.cjs`) |
-| **Type Check / Lint** | `npm run lint` | Runs the TypeScript compiler (`tsc --noEmit`) to validate all types with zero errors |
-| **Preview Static** | `npm run preview` | Spins up Vite's built-in preview server for client files |
-| **Clean Artifacts** | `npm run clean` | Removes prior `dist` builds |
+| **First-time Setup** | `npm run setup` | Creates `.env` from `.env.example` with a generated admin password and webhook secret |
+| **Full-Stack Dev Server** | `npm run dev` | Starts the Express API and the Vite hot-reload frontend on port 3000 |
+| **Production Build** | `npm run build` | Builds the frontend into `dist/` and bundles `server.ts` into `dist/server.cjs` (production mode) |
+| **Start Production** | `npm start` | Runs the built production server (`node dist/server.cjs`) |
+| **Type Check / Lint** | `npm run lint` | Runs the TypeScript compiler (`tsc --noEmit`) |
+| **Clean Artifacts** | `npm run clean` | Removes the `dist/` folder |
+
+All scripts call Node directly (no shell commands or `node_modules/.bin` shims), so they work on Windows, macOS and Linux, including from folders whose names contain `&`.
 
 ---
 
@@ -180,36 +210,56 @@ npm start
 ```text
 findndap/
 ├── index.html                 # Main HTML entry point with meta tags & typography
-├── package.json               # Project manifest, scripts, dependencies & build pipeline
-├── server.ts                  # Full-stack Express server, REST API endpoints & Vite middleware
+├── package.json               # Project manifest, scripts & dependencies
+├── server.ts                  # Express server: REST API routes, auth & roles, Vite middleware / static files
+├── server/
+│   ├── db.ts                  # SQLite schema, first-run seeding and data access (better-sqlite3)
+│   ├── auth.ts                # Password hashing, .env account sync, sessions, role checks, login rate limit
+│   ├── validation.ts          # Input validators, allowed values, collision-safe ids
+│   ├── pdf.ts                 # Dependency-free PDF receipt generator (EN/FR)
+│   └── http.ts                # English/French error and message helpers (Accept-Language)
+├── scripts/
+│   ├── setup-env.mjs          # `npm run setup`: creates .env with generated secrets
+│   ├── build.mjs              # `npm run build`: Vite client build + esbuild server bundle
+│   └── clean.mjs              # `npm run clean`
+├── data/                      # Created at runtime: findndap.db + uploads/ (git-ignored, back it up)
 ├── requirements.txt           # Dependency requirements & endpoint reference list
 ├── tsconfig.json              # TypeScript compilation rules
 ├── vite.config.ts             # Vite configuration with Tailwind CSS plugin
-├── .env.example               # Template environment variables (Port, Gateway API keys)
+├── .env.example               # Configuration template (accounts, secrets, data folder, APK link)
 ├── public/                    # Static public assets
 └── src/
-    ├── main.tsx               # React application entry point
-    ├── App.tsx                # Master state controller, API hydration & layout coordinator
+    ├── main.tsx               # React application entry point (wrapped in the language provider)
+    ├── App.tsx                # Session, data loading from the API, modals & layout
     ├── index.css              # Global styles & Tailwind CSS @import directives
-    ├── types.ts               # TypeScript data models (Building, Unit, Ticket, KYC, DashboardStats)
+    ├── types.ts               # TypeScript data models (Building, Unit, Ticket, KYC, Auth, DashboardStats)
+    ├── vite-env.d.ts          # Types for VITE_* build-time settings
+    ├── i18n/                  # English/French dictionaries and the language context
     ├── data/
-    │   └── mockData.ts        # Seed data (Douala/Yaoundé properties, units, ledgers)
+    │   └── mockData.ts        # Seed data written to the database on first start
     ├── services/
-    │   └── api.ts             # Unified API client service for Web & Mobile applications
+    │   └── api.ts             # API client: session token, language header, downloads
     ├── utils/
-    │   └── apkGenerator.ts    # Binary APK buffer generator & download trigger
+    │   ├── apk.ts             # Android download links from VITE_APK_* settings
+    │   ├── format.ts          # Date and XAF formatting
+    │   ├── smsAudience.ts     # SMS audiences shared by server and client
+    │   └── useModalDismiss.ts # Escape-to-close for dialogs
     └── components/
-        ├── Navbar.tsx                   # Glassmorphic header with live telemetry & quick actions
+        ├── Navbar.tsx                   # Header: language switch, sign in/out, account menu
+        ├── LoginModal.tsx               # Sign-in dialog
         ├── BrandLogo.tsx                # SVG emblem (cadastral pin + house + lens)
-        ├── HeroSection.tsx              # Dynamic hero stats, live ledger badge & mobile preview
+        ├── HeroSection.tsx              # Live hero stats & badges, mobile preview, radar tab
+        ├── CadastralRadarHologram.tsx   # Map of the registered buildings
         ├── LandlordWorkflowSection.tsx  # MoMo collection, bulk SMS, and work-orders
-        ├── AgentCertificationSection.tsx# Cadastral audit requirements & KYC form
-        ├── DeveloperSandboxSection.tsx  # Real APK download, REST API Inspector & Webhook simulator
+        ├── AgentCertificationSection.tsx# Certification application, review status, certified pass
+        ├── AgentApprovalsPanel.tsx      # Administrator review of agent applications
+        ├── DeveloperSandboxSection.tsx  # APK download, REST API Inspector & webhook simulator
         ├── TestimonialsSection.tsx      # Social proof & Pan-African trust badges
         ├── CallToActionSection.tsx      # Pre-footer engagement card
         ├── Footer.tsx                   # Legal notices, OHADA compliance, contact info
-        ├── BuildingRegistrationModal.tsx# Step-by-step building & unit publishing studio
-        └── LandlordConsoleModal.tsx     # Full interactive mobile operations simulator
+        ├── BuildingRegistrationModal.tsx# Step-by-step building & unit publishing (certified agents)
+        ├── LandlordConsoleModal.tsx     # Landlord operations console (read-only unless signed in as admin)
+        └── UnitPricingCard.tsx          # Rent editing, leasing and ending leases for one unit
 ```
 
 ---
@@ -217,12 +267,17 @@ findndap/
 ## ⚡ Troubleshooting & FAQ
 
 ### 1. Port 3000 is already in use
-If another application is using port 3000:
-- Vite will automatically suggest an alternate port (e.g. `http://localhost:3001`).
-- Or you can run:
-  ```bash
-  npx vite --port 5173
-  ```
+If another application is using port 3000, set a different port in `.env` (for example `PORT=3001`) and restart `npm run dev`.
+
+### 2. "Sign in" fails or there is no admin account
+- Check `ADMIN_PASSWORD` in `.env` is set and at least 8 characters, then restart the server. Look for `[auth]` warnings in the terminal.
+- After 5 failed attempts for the same username, sign-in is blocked for 15 minutes.
+
+### 3. `npm install` fails while building `better-sqlite3`
+`better-sqlite3` downloads a prebuilt binary for your Node.js version. If none exists (very new or very old Node.js), npm compiles it and needs build tools (Python and a C++ compiler; on Windows, "Desktop development with C++" from the Visual Studio Build Tools). Using the current Node.js LTS (22 or newer) avoids this.
+
+### 4. Resetting the demo data
+Stop the server and delete the `data/` folder (or just `data/findndap.db`). It is recreated and re-seeded on the next start. This also deletes uploaded agent documents and all certification decisions.
 
 ### 2. PowerShell script execution error on Windows
 If you see an error like `File ... cannot be loaded because running scripts is disabled on this system`:
@@ -269,7 +324,28 @@ When configuring your mobile application client, set the `API_BASE_URL` dependin
 
 ### 2. Complete REST API Endpoints Catalog
 
-All endpoints return and accept JSON payloads with standard HTTP status codes (`200`, `201`, `400`, `404`, `500`).
+All endpoints return and accept JSON payloads with standard HTTP status codes (`200`, `201`, `400`, `401`, `403`, `404`, `409`, `429`, `500`, `503`). Invalid input is rejected with `400` and a JSON body of the form `{ "success": false, "error": "<reason>" }`.
+
+**Authentication & roles.** All `GET` endpoints (except the agent/admin ones below) are public. Every other request needs a session token from `POST /api/auth/login`, sent as `Authorization: Bearer <token>`:
+- **Admin** (landlord/administrator): units, payments, work-orders, SMS, payment simulator, agent approvals.
+- **Agent**: their own certification application; registering buildings once certified.
+
+Missing or expired token → `401`; wrong role → `403`. Tokens last 12 hours and can be revoked with `POST /api/auth/logout`.
+
+**Language.** Send `Accept-Language: fr` to receive error and confirmation messages in French (English otherwise).
+
+#### 0. Authentication
+
+##### `POST /api/auth/login`
+- **Request Body**: `{ "username": "admin", "password": "…" }`
+- **Response**: `{ "token": "<64 hex chars>", "expiresAt": "<ISO date>", "user": { "id", "username", "role" }, "agentKYC": <agent's certification record, or null for admins> }`
+- Wrong credentials → `401`. After 5 failures for the same username from the same IP, further attempts get `429` for 15 minutes.
+
+##### `POST /api/auth/logout`
+- Revokes the token sent in the `Authorization` header.
+
+##### `GET /api/auth/me`
+- Returns the signed-in `user` and, for agents, their `agentKYC` record. `401` if the token is missing or expired.
 
 #### A. System & Real-Time Analytics
 
@@ -330,13 +406,19 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
 #### B. Buildings & Properties
 
 ##### `GET /api/buildings`
-- **Description**: Returns the list of registered properties with cadastral *Titre Foncier* references, amenities, and revenue figures.
+- **Description**: Returns the list of registered properties with cadastral *Titre Foncier* references, amenities, and revenue figures. `totalUnits`, `availableUnits`, `occupancyRate` and `monthlyRevenueXAF` (rent of occupied units) are always computed live from the units registry, here and in `GET /api/buildings/:id`.
 
 ##### `GET /api/buildings/:id`
 - **Description**: Retrieves full details for a specific building, including all nested units.
 
-##### `POST /api/buildings`
+##### `POST /api/buildings` (agent)
 - **Description**: Registers a new building with unit configurations.
+- **Rules**:
+  - Only a signed-in agent whose certification an administrator approved (`403` otherwise). `registeredBy` is set by the server from the agent's certification; ids are generated by the server.
+  - `name` and `cadastreNumber` are required; a `cadastreNumber` that is already registered returns `409`.
+  - `propertyType` must be `Residential Complex`, `Commercial`, `Mixed Use` or `Student Residence`.
+  - Each unit needs a `unitNumber` (unique within the building) and a positive `rentAmountXAF`; `status` must be `Available`, `Occupied` or `Under Maintenance`.
+  - Unit counts, occupancy and revenue are derived from `units` (any values sent are ignored); missing `amenities` default to `[]`.
 - **Request Body**:
   ```json
   {
@@ -370,8 +452,13 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
 ##### `GET /api/units?buildingId={id}&status={status}`
 - **Description**: Lists rental units with optional query filters by `buildingId` and `status` (`Available`, `Occupied`, `Under Maintenance`).
 
-##### `PATCH /api/units/:id`
+##### `PATCH /api/units/:id` (admin)
 - **Description**: Updates unit status, rent pricing, tenant identity, or outstanding balance.
+- **Rules**:
+  - `status` must be `Available`, `Occupied` or `Under Maintenance`; `rentAmountXAF` must be positive and `balanceDueXAF` non-negative.
+  - `tenantPhone`, if sent, must be a Cameroon mobile number.
+  - Marking a unit `Occupied` requires a `tenantName` (sent now or already on the unit).
+  - Marking a unit `Available` ends the lease and clears `tenantName`/`tenantPhone`; it is refused with `409` while `balanceDueXAF` is above zero.
 - **Request Body**:
   ```json
   {
@@ -390,11 +477,14 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
 ##### `GET /api/transactions`
 - **Description**: Lists all reconciled and escrow-locked financial records.
 
-##### `POST /api/transactions`
+##### `POST /api/transactions` (admin)
 - **Description**: Records a rent settlement from MTN MoMo or Orange Money, automatically reconciling the corresponding unit's arrears.
+- **Rules**: a positive `amountXAF` is required, plus `tenantName` unless `unitId` points to a leased unit (the tenant, building and unit are then taken from the unit); `method` must be `MTN MoMo` or `Orange Money`; `status` must be `Completed`, `Escrow_Locked` or `Arrears`.
+- **Unit matching**: Unit numbers repeat across buildings, so the unit is resolved by `unitId` when given, otherwise by exact `buildingName` + `unitNumber`, narrowed by `tenantName` if still ambiguous. If no single unit matches, the payment is recorded but no arrears are reconciled.
 - **Request Body**:
   ```json
   {
+    "unitId": "u-102",
     "tenantName": "Sophie Ebanda",
     "buildingName": "Résidence Le Cristal",
     "unitNumber": "Apt 102",
@@ -407,6 +497,7 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
 ##### `POST /api/momo/webhook`
 - **Description**: Callback receiver for MTN MoMo & Orange Money telecom webhooks. Automatically processes payment notifications, settles arrears, and updates the dynamic ledger.
 - **Authentication**: Requires an `X-Webhook-Secret` header matching the server's `MOMO_WEBHOOK_SECRET` environment variable (compared in constant time). Missing or wrong secret → `401`. If `MOMO_WEBHOOK_SECRET` is not set, every request is rejected with `503`.
+- **Rules**: `amount` must be a positive number (`400` otherwise). The unit is matched the same way as `POST /api/transactions` (`unitId`, or `buildingName` + `unitReference`, then `tenantName`); `reconciledUnit` in the response is `null` when no single unit matches.
 - **Request Body**:
   ```json
   {
@@ -415,13 +506,17 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
     "currency": "XAF",
     "payerMsisdn": "+237671223344",
     "unitReference": "Apt 101",
+    "buildingName": "Résidence Le Cristal",
     "tenantName": "Dr. Jean-Marc Bella",
     "transactionRef": "MOMO-LIVE-948120"
   }
   ```
 
-##### `POST /api/momo/simulate`
-- **Description**: Unauthenticated, development-only twin of `/api/momo/webhook` used by the in-browser Developer Sandbox. Accepts the same body and performs the same reconciliation. Returns `404` when `NODE_ENV=production`.
+##### `POST /api/momo/simulate` (admin)
+- **Description**: Development-only twin of `/api/momo/webhook` used by the in-browser Developer Sandbox. Requires an admin session instead of the webhook secret, accepts the same body and performs the same reconciliation. Returns `404` in production builds.
+
+##### `GET /api/transactions/:id/receipt?lang=en|fr`
+- **Description**: Downloads an official PDF receipt for a `Completed` payment (`409` for escrow or arrears records). `lang` defaults to the `Accept-Language` header.
 
 ---
 
@@ -430,8 +525,9 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
 ##### `GET /api/tickets`
 - **Description**: Retrieves all maintenance work-orders.
 
-##### `POST /api/tickets`
+##### `POST /api/tickets` (admin)
 - **Description**: Creates a new maintenance ticket reported by tenant or landlord.
+- **Rules**: give `unitId` (building, unit and tenant are filled in from it) or `buildingName` + `unitNumber`; `description` is required; `category` must be `Plumbing`, `Electrical`, `Generator`, `Security` or `Masonry`; `urgency` must be `Low`, `Medium`, `High` or `Emergency`.
 - **Request Body**:
   ```json
   {
@@ -444,8 +540,8 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
   }
   ```
 
-##### `PATCH /api/tickets/:id`
-- **Description**: Advances ticket status (`Logged` ➔ `In-Review` ➔ `Dispatched` ➔ `Resolved`), assigns a certified contractor vendor, and updates final repair costs.
+##### `PATCH /api/tickets/:id` (admin)
+- **Description**: Advances ticket status (`Logged` ➔ `In-Review` ➔ `Dispatched` ➔ `Resolved`), assigns a certified contractor vendor, and updates final repair costs. Unknown `status` values or a negative `costXAF` return `400`.
 
 ---
 
@@ -454,14 +550,15 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
 ##### `GET /api/sms`
 - **Description**: Fetches the dispatch history of bulk announcements sent to tenants.
 
-##### `POST /api/sms`
-- **Description**: Dispatches a bulk SMS broadcast via the telecom gateway.
+##### `POST /api/sms` (admin)
+- **Description**: Records a bulk SMS broadcast and its recipient count. **Messages are not yet sent to a real SMS provider**; connecting one is still to do.
+- **Targets**: `all`, `arrears` (tenants with a balance due), or `building:<buildingId>`; the audience label (e.g. `All Building Tenants`) is also accepted, and `target` defaults to `all`. `recipientCount` is the number of tenants in that audience with a phone number on file. Unknown targets, empty audiences, and blank `title`/`message` return `400`.
 - **Request Body**:
   ```json
   {
     "title": "Scheduled Generator Maintenance",
     "message": "Dear tenants, routine genset servicing will take place on Saturday from 10:00 to 12:00. - FindNdap Ops",
-    "target": "All Building Tenants"
+    "target": "building:bld-001"
   }
   ```
 
@@ -469,14 +566,22 @@ All endpoints return and accept JSON payloads with standard HTTP status codes (`
 
 #### G. Agent Accreditation & KYC
 
-##### `GET /api/agent/kyc`
-- **Description**: Retrieves the active broker's accreditation profile.
+##### `GET /api/agent/kyc` (agent)
+- **Description**: Returns the signed-in agent's certification record (`status`: `unverified`, `in-review`, `certified` or `rejected`, plus `badgeId` and the reviewer's `reviewNote`).
 
-##### `POST /api/agent/kyc`
-- **Description**: Submits or updates broker accreditation details with official license IDs (*RCCM/NUI*).
+##### `POST /api/agent/kyc` (agent)
+- **Description**: Submits (or updates) a certification application. It always goes to `in-review`; agents can never certify themselves. Certified agents get `409` (an administrator must revoke first).
+- **Rules**: `fullName`, `agencyName`, `licenseId` (*RCCM/NUI*) and `city` are required; `momoNumber` must be a Cameroon mobile number (9 digits starting with `6`, optional `+237`). An ID document is required on the first submission: `document: { name, mimeType, dataBase64 }` with `mimeType` `application/pdf`, `image/jpeg` or `image/png`, at most 5 MB; the file's content must match its type.
 
-##### `POST /api/agent/toggle-demo`
-- **Description**: Toggles between Certified and Uncertified broker mode for rapid UI testing and QA demonstrations.
+##### `GET /api/admin/agents` (admin)
+- **Description**: Lists all applications, those awaiting review first.
+
+##### `GET /api/admin/agents/:userId/document` (admin)
+- **Description**: Downloads the applicant's uploaded ID document.
+
+##### `POST /api/admin/agents/:userId/review` (admin)
+- **Request Body**: `{ "decision": "approve" | "reject", "note": "…" }`
+- **Rules**: only applications `in-review` can be approved (a `FND-CERT-YYYY-XXXXXX` badge is issued); rejecting requires a `note` and also works on certified agents (revocation).
 
 ---
 
@@ -608,7 +713,7 @@ Implemented a full suite of REST endpoints in `server.ts` serving both the web m
 
 ---
 
-### 7. Physical Android Staging APK Generator (`src/utils/apkGenerator.ts`)
+### 7. Physical Android Staging APK Generator (`src/utils/apkGenerator.ts`) — removed in 12
 - Engineered a client-side binary APK builder generating a valid ZIP-compliant archive format.
 - Packages essential Android bundle assets including `AndroidManifest.xml` (configured with `usesCleartextTraffic`), `classes.dex`, `resources.arsc`, and FindNdap launcher metadata.
 - Enables property managers and mobile engineers to click **"Download APK"** and receive an immediate physical file download (`FindNdap-Mobile-v1.4.2-staging.apk`) with verified SHA-256 integrity checksums.
@@ -670,6 +775,19 @@ Inspired by cutting-edge interactive product showcases (Zenith, CSWatch, Vibram,
   - One-click trigger for the 3D Cadastral Radar HUD and instant Dark/Light futuristic theme switching.
 - **Precision HUD Reticles (`hudCorners`)**:
   - Stylized technical corner brackets framing the 3D tilt cards for an authentic cyber-tactical interface look.
+
+---
+
+### 12. Accounts, Persistence, Real Certification, Receipts & Bilingual Interface
+- **SQLite persistence** (`server/db.ts`): all data is stored in `data/findndap.db` and survives restarts; demo data is seeded only into an empty database. Record ids are now random (`tx-3f9a1c0b7e2d`) instead of time-based, and timestamps are stored as ISO dates.
+- **Role-based logins** (`server/auth.ts`): an administrator account and agent accounts configured in `.env`; scrypt password hashing, 12-hour session tokens (stored hashed), login rate limiting. Reads stay public; every write requires the right role.
+- **Real certification**: agents upload a PDF/JPG/PNG ID document (type checked against the file's content) and apply; administrators review the document and approve (badge issued) or reject with a reason in the console's new *Agent Approvals* tab. The demo certification toggle, "Reset Demo State", the pre-certified demo agent and the fake quick-fill document were removed.
+- **Console**: read-only for visitors; new work-order form; real PDF receipts (`GET /api/transactions/:id/receipt`); payments recorded against a unit's id.
+- **Live data everywhere**: the hero badges and the radar map use the registered buildings and payments; the fake "Avg SLA", broker counts, APK sizes and download counters were removed. Collection rate is capped at 100%.
+- **Android APK**: the fake generated file was removed; download buttons use `VITE_APK_URL` and say "APK not available yet" until a real build is published.
+- **English/French**: the EN/FR switch translates the whole interface; server messages follow the chosen language (`Accept-Language`).
+- **Accessibility**: Escape closes dialogs, the hero phone card works with the keyboard, icon-only dock buttons have labels, and account avatars show initials instead of a stock photo.
+- **Tooling**: `npm run setup` creates `.env` with generated secrets; all npm scripts call Node directly so they work on every OS and in folders containing `&`; `npm start` now really runs in production mode.
 
 ---
 
