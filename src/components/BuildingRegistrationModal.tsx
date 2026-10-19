@@ -152,23 +152,23 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-stretch sm:items-center justify-center p-0 sm:p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="building-modal-title"
-        className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-[#002044]/10 overflow-hidden my-8"
+        className="relative w-full max-w-3xl bg-white rounded-none sm:rounded-3xl shadow-2xl sm:border border-[#002044]/10 overflow-hidden sm:my-8 flex flex-col min-h-[100dvh] sm:min-h-0"
       >
         {/* Header */}
-        <div className="bg-[#002044] text-white p-6 flex items-center justify-between">
+        <div className="bg-[#002044] text-white px-4 py-3 sm:p-6 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-6 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#ff9827] text-white flex items-center justify-center shadow-sm">
               <Building2 className="w-5 h-5" aria-hidden="true" />
             </div>
             <div>
-              <h2 id="building-modal-title" className="text-xl font-extrabold tracking-tight">{t('buildingModal.title')}</h2>
+              <h2 id="building-modal-title" className="text-base sm:text-xl font-extrabold tracking-tight">{t('buildingModal.title')}</h2>
               <span className="text-xs text-[#d5e3ff]">
                 {t('buildingModal.subtitle')}
               </span>
@@ -177,7 +177,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
           <button
             onClick={onClose}
             aria-label={t('buildingModal.close')}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+            className="w-10 h-10 sm:w-9 sm:h-9 shrink-0 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
@@ -185,7 +185,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
 
         {/* RESTRICTION CHECK: Only Certified Agents Can Register Buildings */}
         {!isCertifiedAgent ? (
-          <div className="p-8 text-center space-y-6">
+          <div className="p-5 sm:p-8 text-center space-y-5 sm:space-y-6">
             <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 mx-auto flex items-center justify-center">
               <ShieldAlert className="w-8 h-8" aria-hidden="true" />
             </div>
@@ -251,13 +251,13 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
           </div>
         ) : (
           /* CERTIFIED AGENT: STEPPED FORM */
-          <form onSubmit={handleSubmitBuilding}>
+          <form onSubmit={handleSubmitBuilding} className="flex flex-col flex-1 min-h-0">
             {/* Step indicators */}
-            <div className="flex border-b border-[#eaedff] bg-[#faf8ff] text-xs font-bold text-[#43474f]">
+            <div className="flex border-b border-[#eaedff] bg-[#faf8ff] text-[11px] sm:text-xs font-bold leading-tight text-[#43474f] shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveStep(1)}
-                className={`flex-1 py-3 px-4 text-center border-b-2 transition-colors ${
+                className={`flex-1 py-3 px-2 sm:px-4 text-center border-b-2 transition-colors ${
                   activeStep === 1
                     ? 'border-[#ff9827] text-[#002044] bg-white'
                     : 'border-transparent hover:bg-white/60'
@@ -268,7 +268,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
               <button
                 type="button"
                 onClick={() => setActiveStep(2)}
-                className={`flex-1 py-3 px-4 text-center border-b-2 transition-colors ${
+                className={`flex-1 py-3 px-2 sm:px-4 text-center border-b-2 transition-colors ${
                   activeStep === 2
                     ? 'border-[#ff9827] text-[#002044] bg-white'
                     : 'border-transparent hover:bg-white/60'
@@ -279,7 +279,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
               <button
                 type="button"
                 onClick={() => setActiveStep(3)}
-                className={`flex-1 py-3 px-4 text-center border-b-2 transition-colors ${
+                className={`flex-1 py-3 px-2 sm:px-4 text-center border-b-2 transition-colors ${
                   activeStep === 3
                     ? 'border-[#ff9827] text-[#002044] bg-white'
                     : 'border-transparent hover:bg-white/60'
@@ -289,7 +289,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
               </button>
             </div>
 
-            <div className="p-6 max-h-[65vh] overflow-y-auto space-y-6">
+            <div className="p-4 sm:p-6 flex-1 sm:flex-none sm:max-h-[65vh] overflow-y-auto space-y-5 sm:space-y-6">
               {formError && (
                 <div role="alert" className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
                   {formError}
@@ -566,7 +566,7 @@ export const BuildingRegistrationModal: React.FC<BuildingRegistrationModalProps>
             </div>
 
             {/* Modal Footer Controls */}
-            <div className="bg-[#faf8ff] p-4 px-6 border-t border-[#eaedff] flex items-center justify-between">
+            <div className="bg-[#faf8ff] px-4 sm:px-6 pt-3 sm:pt-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-[#eaedff] flex items-center justify-between gap-3 shrink-0 sticky bottom-0">
               {activeStep > 1 ? (
                 <button
                   type="button"

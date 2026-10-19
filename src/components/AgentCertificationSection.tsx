@@ -65,7 +65,7 @@ function readAsBase64(file: File): Promise<string> {
 }
 
 const inputClass =
-  'w-full h-11 px-3.5 rounded-xl bg-[#f2f3ff] text-[#131b2e] text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002044] border border-[#eaedff]';
+  'w-full h-11 px-3.5 rounded-xl bg-[#f2f3ff] text-[#131b2e] text-base sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002044] border border-[#eaedff]';
 
 export const AgentCertificationSection: React.FC<AgentCertificationSectionProps> = ({
   user,
@@ -151,7 +151,7 @@ export const AgentCertificationSection: React.FC<AgentCertificationSectionProps>
   };
 
   const renderSignInPrompt = () => (
-    <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#002044]/10 space-y-4">
+    <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-xl border border-[#002044]/10 space-y-4">
       <h3 className="text-lg font-bold text-[#002044]">{t('agentCert.applicationTitle')}</h3>
       <p className="text-sm text-[#43474f]">
         {t('agentCert.signInPrompt')}
@@ -167,7 +167,7 @@ export const AgentCertificationSection: React.FC<AgentCertificationSectionProps>
   );
 
   const renderAdminPanel = () => (
-    <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#002044]/10 space-y-4">
+    <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-xl border border-[#002044]/10 space-y-4">
       <h3 className="text-lg font-bold text-[#002044]">{t('agentCert.adminTitle')}</h3>
       <p className="text-sm text-[#43474f]">
         {t('agentCert.adminBody')}
@@ -183,7 +183,7 @@ export const AgentCertificationSection: React.FC<AgentCertificationSectionProps>
   );
 
   const renderCertifiedPass = (kyc: AgentKYC) => (
-    <div className="bg-[#faf8ff] rounded-3xl p-6 sm:p-8 shadow-xl border-2 border-emerald-500/30 relative overflow-hidden">
+    <div className="bg-[#faf8ff] rounded-3xl p-5 sm:p-8 shadow-xl border-2 border-emerald-500/30 relative overflow-hidden">
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl" />
 
       <div className="flex items-center justify-between pb-4 mb-6 border-b border-[#002044]/10">
@@ -238,7 +238,7 @@ export const AgentCertificationSection: React.FC<AgentCertificationSectionProps>
   );
 
   const renderUnderReview = (kyc: AgentKYC) => (
-    <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border-2 border-amber-300 space-y-5">
+    <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-xl border-2 border-amber-300 space-y-5">
       <div className="flex items-center gap-3">
         <Clock className="w-6 h-6 text-amber-600" aria-hidden="true" />
         <div>
@@ -277,7 +277,7 @@ export const AgentCertificationSection: React.FC<AgentCertificationSectionProps>
   );
 
   const renderForm = (kyc: AgentKYC) => (
-    <div className="bg-[#ffffff] rounded-3xl p-6 sm:p-8 shadow-xl border border-[#002044]/10 relative">
+    <div className="bg-[#ffffff] rounded-3xl p-5 sm:p-8 shadow-xl border border-[#002044]/10 relative">
       <div className="flex items-center justify-between pb-4 mb-6 bg-[#f2f3ff] p-4 rounded-2xl border border-[#eaedff]">
         <div>
           <h3 className="text-lg font-bold text-[#002044]">{t('agentCert.applicationTitle')}</h3>
@@ -476,9 +476,9 @@ export const AgentCertificationSection: React.FC<AgentCertificationSectionProps>
   };
 
   return (
-    <section id="agent-portal" className="py-20 px-4 md:px-8 lg:px-12 bg-white relative">
+    <section id="agent-portal" className="py-14 sm:py-20 px-4 md:px-8 lg:px-12 bg-white relative scroll-mt-24">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-14">
           {/* Left Column: Governance, Rules & Pipeline */}
           <div className="lg:col-span-5 flex flex-col justify-between">
             <div>
@@ -487,7 +487,7 @@ export const AgentCertificationSection: React.FC<AgentCertificationSectionProps>
                 {t('agentCert.eyebrow')}
               </div>
 
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#002044] tracking-tight mb-4">
+              <h2 className="text-[1.75rem] sm:text-4xl font-extrabold text-[#002044] tracking-tight leading-tight mb-4">
                 {t('agentCert.title')}
               </h2>
 
@@ -501,12 +501,12 @@ export const AgentCertificationSection: React.FC<AgentCertificationSectionProps>
                 </div>
               </div>
 
-              <p className="text-sm sm:text-base text-[#43474f] mb-8 leading-relaxed">
+              <p className="text-sm sm:text-base text-[#43474f] mb-6 sm:mb-8 leading-relaxed">
                 {t('agentCert.intro')}
               </p>
 
               {/* 3-Step Verification Pipeline */}
-              <div className="space-y-6 mb-8">
+              <div className="space-y-5 sm:space-y-6 mb-6 sm:mb-8">
                 <div className="flex items-start gap-4">
                   <div className="w-8 h-8 rounded-full bg-[#002044] text-white flex items-center justify-center text-sm font-bold shrink-0">
                     1
